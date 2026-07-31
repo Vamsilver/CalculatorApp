@@ -4,13 +4,13 @@ namespace CalculatorApp;
 
 public sealed class CalculatorEngine
 {
-    private decimal? _accumulator;
+    private double? _accumulator;
     private string? _pendingOperation;
 
-    public decimal? Result => _accumulator;
+    public double? Result => _accumulator;
     public string? PendingOperation => _pendingOperation;
 
-    public decimal SelectOperation(decimal value, string operation)
+    public double SelectOperation(double value, string operation)
     {
         ValidateOperation(operation);
 
@@ -25,7 +25,7 @@ public sealed class CalculatorEngine
         return _accumulator.Value;
     }
 
-    public decimal Equals(decimal value)
+    public double Equals(double value)
     {
         if (_accumulator is null || _pendingOperation is null)
         {
@@ -44,17 +44,33 @@ public sealed class CalculatorEngine
         _pendingOperation = null;
     }
 
-    public static decimal Calculate(decimal left, decimal right, string operation) => operation switch
+    public static double Calculate(double left, double right, string operation)
     {
-        "+" => left + right,
-        "−" => left - right,
-        "×" => left * right,
-        "÷" when right == 0 => throw new DivideByZeroException("Деление на ноль невозможно."),
-        "÷" => left / right,
-        _ => throw new ArgumentException("Неизвестная операция.", nameof(operation))
-    };
+        var result = operation switch
+        {
+            "+" => left + right,
+            "−" => left - right,
+            "×" => left * right,
+            "÷" when right == 0 => throw new DivideByZeroException("Деление на ноль невозможно."),
+            "÷" => left / right,
+            _ => throw new ArgumentException("Неизвестная операция.", nameof(operation))
+        };
 
-    public static string Format(decimal value) => value.ToString("G29", CultureInfo.CurrentCulture);
+        return double.IsFinite(result)
+            ? result
+            : throw new OverflowException("Результат выходит за допустимый диапазон чисел.");
+    }
+
+    public static string Format(double value)
+    {
+        if (value == 0) return "0";
+
+        var absolute = Math.Abs(value);
+        var format = absolute >= 1E15 || absolute < 1E-9
+            ? "0.##############E+0"
+            : "0.###############";
+        return value.ToString(format, CultureInfo.CurrentCulture);
+    }
 
     private static void ValidateOperation(string operation)
     {

@@ -243,12 +243,14 @@ public sealed class CalculatorForm : Form
         _startNewNumber = true;
     }
 
-    private void ApplyUnary(Func<decimal, string> expression, Func<decimal, decimal> operation)
+    private void ApplyUnary(Func<double, string> expression, Func<double, double> operation)
     {
         if (!TryReadDisplay(out var value)) return;
         try
         {
             var result = operation(value);
+            if (!double.IsFinite(result))
+                throw new OverflowException("Результат выходит за допустимый диапазон чисел.");
             var operationText = expression(value);
             _display.Text = CalculatorEngine.Format(result);
             _expressionLabel.Text = $"{operationText} =";
@@ -270,7 +272,7 @@ public sealed class CalculatorForm : Form
             return;
         }
 
-        _display.Text = CalculatorEngine.Format((decimal)Math.Sqrt((double)value));
+        _display.Text = CalculatorEngine.Format(Math.Sqrt(value));
         _expressionLabel.Text = $"√{CalculatorEngine.Format(value)} =";
         AddHistoryEntry($"√{CalculatorEngine.Format(value)} = {_display.Text}");
         _startNewNumber = true;
@@ -345,9 +347,9 @@ public sealed class CalculatorForm : Form
         }
     }
 
-    private bool TryReadDisplay(out decimal value)
+    private bool TryReadDisplay(out double value)
     {
-        if (decimal.TryParse(_display.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out value)) return true;
+        if (double.TryParse(_display.Text, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out value) && double.IsFinite(value)) return true;
         MessageBox.Show("На дисплее находится некорректное число.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
         ClearAll();
         return false;
