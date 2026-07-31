@@ -10,6 +10,7 @@ public sealed class CalculatorForm : Form
     private readonly Label _expressionLabel = new();
     private readonly ListBox _history = new();
     private readonly TableLayoutPanel _historyPanel = new();
+    private readonly TableLayoutPanel _scientificTools = new();
     private readonly TableLayoutPanel _keypad = new();
     private readonly Button _themeButton = new();
     private readonly ToolTip _toolTip = new();
@@ -19,6 +20,7 @@ public sealed class CalculatorForm : Form
     private readonly System.Windows.Forms.Timer _sidebarTimer = new() { Interval = 15 };
     private readonly System.Windows.Forms.Timer _historyTimer = new() { Interval = 15 };
     private RowStyle _historyRow = null!;
+    private RowStyle _scientificToolsRow = null!;
     private bool _sidebarOpen;
     private bool _historyOpen;
     private bool _fittingDisplay;
@@ -52,9 +54,11 @@ public sealed class CalculatorForm : Form
         _root.Dock = DockStyle.Fill;
         _root.Padding = new Padding(8);
         _root.ColumnCount = 1;
-        _root.RowCount = 3;
+        _root.RowCount = 4;
         _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 125));
+        _scientificToolsRow = new RowStyle(SizeType.Absolute, 0);
+        _root.RowStyles.Add(_scientificToolsRow);
         _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _historyRow = new RowStyle(SizeType.Absolute, 0);
         _root.RowStyles.Add(_historyRow);
@@ -166,9 +170,12 @@ public sealed class CalculatorForm : Form
         displayPanel.SetColumnSpan(_display, 3);
         _root.Controls.Add(displayPanel, 0, 0);
 
+        BuildScientificTools();
+        _root.Controls.Add(_scientificTools, 0, 1);
+
         _keypad.Dock = DockStyle.Fill;
         _keypad.Margin = Padding.Empty;
-        _root.Controls.Add(_keypad, 0, 1);
+        _root.Controls.Add(_keypad, 0, 2);
         BuildStandardKeypad();
 
         _historyPanel.Dock = DockStyle.Fill;
@@ -195,8 +202,67 @@ public sealed class CalculatorForm : Form
             e.SuppressKeyPress = true;
         };
         _historyPanel.Controls.Add(_history, 0, 1);
-        _root.Controls.Add(_historyPanel, 0, 2);
+        _root.Controls.Add(_historyPanel, 0, 3);
         _sidePanel.BringToFront();
+    }
+
+    private void BuildScientificTools()
+    {
+        _scientificTools.Dock = DockStyle.Fill;
+        _scientificTools.Margin = Padding.Empty;
+        _scientificTools.ColumnCount = 1;
+        _scientificTools.RowCount = 3;
+        _scientificTools.RowStyles.Add(new RowStyle(SizeType.Percent, 28));
+        _scientificTools.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
+        _scientificTools.RowStyles.Add(new RowStyle(SizeType.Percent, 42));
+
+        var formatBar = new FlowLayoutPanel { Dock = DockStyle.Fill, Margin = Padding.Empty, WrapContents = false };
+        Button? angleButton = null;
+        angleButton = ToolButton(_degreesMode ? "DEG" : "RAD", (_, _) =>
+        {
+            _degreesMode = !_degreesMode;
+            angleButton!.Text = _degreesMode ? "DEG" : "RAD";
+        });
+        formatBar.Controls.Add(angleButton);
+        formatBar.Controls.Add(ToolButton("F-E", (_, _) => ToggleScientificFormat()));
+        _scientificTools.Controls.Add(formatBar, 0, 0);
+
+        var memoryBar = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = Padding.Empty, ColumnCount = 6, RowCount = 1 };
+        for (var i = 0; i < 6; i++) memoryBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F / 6));
+        memoryBar.Controls.Add(ToolButton("MC", (_, _) => ClearMemory()), 0, 0);
+        memoryBar.Controls.Add(ToolButton("MR", (_, _) => RecallMemory()), 1, 0);
+        memoryBar.Controls.Add(ToolButton("M+", (_, _) => ChangeMemory(1)), 2, 0);
+        memoryBar.Controls.Add(ToolButton("M−", (_, _) => ChangeMemory(-1)), 3, 0);
+        memoryBar.Controls.Add(ToolButton("MS", (_, _) => StoreMemory()), 4, 0);
+        memoryBar.Controls.Add(ToolButton("M⌄", (_, _) => RecallMemory()), 5, 0);
+        _scientificTools.Controls.Add(memoryBar, 0, 1);
+
+        var functionBar = new FlowLayoutPanel { Dock = DockStyle.Fill, Margin = Padding.Empty, WrapContents = false };
+        Button? trigButton = null;
+        trigButton = ToolButton("△  Тригонометрия  ⌄", (_, _) => ShowTrigMenu(trigButton!), true);
+        Button? functionsButton = null;
+        functionsButton = ToolButton("ƒ  Функции  ⌄", (_, _) => ShowFunctionsMenu(functionsButton!), true);
+        functionBar.Controls.Add(trigButton);
+        functionBar.Controls.Add(functionsButton);
+        _scientificTools.Controls.Add(functionBar, 0, 2);
+    }
+
+    private static Button ToolButton(string text, EventHandler handler, bool wide = false)
+    {
+        var button = new Button
+        {
+            Text = text,
+            Dock = wide ? DockStyle.None : DockStyle.Fill,
+            AutoSize = wide,
+            Height = 34,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 9F),
+            Margin = new Padding(2, 1, 2, 1),
+            Padding = wide ? new Padding(6, 0, 6, 0) : Padding.Empty
+        };
+        button.FlatAppearance.BorderSize = 0;
+        button.Click += handler;
+        return button;
     }
 
     private void SwitchMode(bool scientific)
@@ -208,6 +274,8 @@ public sealed class CalculatorForm : Form
         }
 
         _scientificMode = scientific;
+        _scientificToolsRow.Height = scientific ? 108 : 0;
+        _scientificTools.Visible = scientific;
         _modeLabel.Text = scientific ? "Инженерный" : "Обычный";
         ClearAll();
         if (scientific) BuildScientificKeypad();
@@ -247,38 +315,24 @@ public sealed class CalculatorForm : Form
 
     private void BuildScientificKeypad()
     {
-        ConfigureKeypad(5, 9);
-        Button? angleButton = null;
-        angleButton = AddButton(_degreesMode ? "DEG" : "RAD", 0, 0, (_, _) =>
-        {
-            _degreesMode = !_degreesMode;
-            angleButton!.Text = _degreesMode ? "DEG" : "RAD";
-        });
-        AddButton("F-E", 1, 0, (_, _) => ToggleScientificFormat()); AddButton("MC", 2, 0, (_, _) => ClearMemory());
-        AddButton("MR", 3, 0, (_, _) => RecallMemory()); AddButton("MS", 4, 0, (_, _) => StoreMemory());
-        AddButton("M+", 0, 1, (_, _) => ChangeMemory(1)); AddButton("M−", 1, 1, (_, _) => ChangeMemory(-1));
-        AddButton("2nd", 2, 1, (_, _) => { _secondFunctions = !_secondFunctions; BuildScientificKeypad(); ApplyTheme(); });
-        AddButton("π", 3, 1, (_, _) => SetConstant(Math.PI, "π")); AddButton("e", 4, 1, (_, _) => SetConstant(Math.E, "e"));
-        Button? trigButton = null;
-        trigButton = AddButton("Тригонометрия ▼", 0, 2, (_, _) => ShowTrigMenu(trigButton!), 2);
-        Button? functionsButton = null;
-        functionsButton = AddButton("Функции ▼", 2, 2, (_, _) => ShowFunctionsMenu(functionsButton!), 2);
-        AddButton("mod", 4, 2, (_, _) => ExecuteOperation("mod"));
-        AddButton(_secondFunctions ? "x³" : "x²", 0, 3, (_, _) => ApplyUnary(value => $"{FormatValue(value)}{(_secondFunctions ? "³" : "²")}", value => Math.Pow(value, _secondFunctions ? 3 : 2)));
-        AddButton("1/x", 1, 3, (_, _) => ApplyUnary(value => $"1/{FormatValue(value)}", value => value == 0 ? throw new DivideByZeroException("Деление на ноль невозможно.") : 1 / value));
-        AddButton("|x|", 2, 3, (_, _) => ApplyUnary(value => $"|{FormatValue(value)}|", Math.Abs));
-        AddButton("⌊x⌋", 3, 3, (_, _) => ApplyUnary(value => $"floor({FormatValue(value)})", Math.Floor));
-        AddButton("⌈x⌉", 4, 3, (_, _) => ApplyUnary(value => $"ceil({FormatValue(value)})", Math.Ceiling));
-        AddButton(_secondFunctions ? "³√x" : "²√x", 0, 4, (_, _) => ApplyRoot()); AddButton("(", 1, 4, (_, _) => OpenParenthesis());
-        AddButton(")", 2, 4, (_, _) => CloseParenthesis()); AddButton("n!", 3, 4, (_, _) => ApplyFactorial()); AddButton("÷", 4, 4, OperationClick);
-        AddButton("xʸ", 0, 5, (_, _) => ExecuteOperation("^")); AddButton("7", 1, 5, DigitClick); AddButton("8", 2, 5, DigitClick); AddButton("9", 3, 5, DigitClick); AddButton("×", 4, 5, OperationClick);
-        AddButton(_secondFunctions ? "2ˣ" : "10ˣ", 0, 6, (_, _) => ApplyUnary(value => $"{(_secondFunctions ? 2 : 10)}^{FormatValue(value)}", value => Math.Pow(_secondFunctions ? 2 : 10, value)));
-        AddButton("4", 1, 6, DigitClick); AddButton("5", 2, 6, DigitClick); AddButton("6", 3, 6, DigitClick); AddButton("−", 4, 6, OperationClick);
-        AddButton("log", 0, 7, (_, _) => ApplyUnary(value => $"log({FormatValue(value)})", value => value > 0 ? Math.Log10(value) : throw new ArgumentOutOfRangeException(nameof(value), "Логарифм определён только для положительных чисел.")));
-        AddButton("1", 1, 7, DigitClick); AddButton("2", 2, 7, DigitClick); AddButton("3", 3, 7, DigitClick); AddButton("+", 4, 7, OperationClick);
-        AddButton("ln", 0, 8, (_, _) => ApplyUnary(value => $"ln({FormatValue(value)})", value => value > 0 ? Math.Log(value) : throw new ArgumentOutOfRangeException(nameof(value), "Логарифм определён только для положительных чисел.")));
-        AddButton("±", 1, 8, (_, _) => ToggleSign()); AddButton("0", 2, 8, DigitClick); AddButton(",", 3, 8, (_, _) => EnterDecimalSeparator());
-        _equalsButton = AddButton("=", 4, 8, EqualsClick);
+        ConfigureKeypad(5, 7);
+        AddButton("2nd", 0, 0, (_, _) => { _secondFunctions = !_secondFunctions; BuildScientificKeypad(); ApplyTheme(); });
+        AddButton("π", 1, 0, (_, _) => SetConstant(Math.PI, "π")); AddButton("e", 2, 0, (_, _) => SetConstant(Math.E, "e"));
+        AddButton("C", 3, 0, (_, _) => ClearAll()); AddButton("⌫", 4, 0, (_, _) => Backspace());
+        AddButton(_secondFunctions ? "x³" : "x²", 0, 1, (_, _) => ApplyUnary(value => $"{FormatValue(value)}{(_secondFunctions ? "³" : "²")}", value => Math.Pow(value, _secondFunctions ? 3 : 2)));
+        AddButton("1/x", 1, 1, (_, _) => ApplyUnary(value => $"1/{FormatValue(value)}", value => value == 0 ? throw new DivideByZeroException("Деление на ноль невозможно.") : 1 / value));
+        AddButton("|x|", 2, 1, (_, _) => ApplyUnary(value => $"|{FormatValue(value)}|", Math.Abs));
+        AddButton("exp", 3, 1, (_, _) => ApplyUnary(value => $"exp({FormatValue(value)})", Math.Exp)); AddButton("mod", 4, 1, (_, _) => ExecuteOperation("mod"));
+        AddButton(_secondFunctions ? "³√x" : "²√x", 0, 2, (_, _) => ApplyRoot()); AddButton("(", 1, 2, (_, _) => OpenParenthesis());
+        AddButton(")", 2, 2, (_, _) => CloseParenthesis()); AddButton("n!", 3, 2, (_, _) => ApplyFactorial()); AddButton("÷", 4, 2, OperationClick);
+        AddButton("xʸ", 0, 3, (_, _) => ExecuteOperation("^")); AddButton("7", 1, 3, DigitClick); AddButton("8", 2, 3, DigitClick); AddButton("9", 3, 3, DigitClick); AddButton("×", 4, 3, OperationClick);
+        AddButton(_secondFunctions ? "2ˣ" : "10ˣ", 0, 4, (_, _) => ApplyUnary(value => $"{(_secondFunctions ? 2 : 10)}^{FormatValue(value)}", value => Math.Pow(_secondFunctions ? 2 : 10, value)));
+        AddButton("4", 1, 4, DigitClick); AddButton("5", 2, 4, DigitClick); AddButton("6", 3, 4, DigitClick); AddButton("−", 4, 4, OperationClick);
+        AddButton("log", 0, 5, (_, _) => ApplyUnary(value => $"log({FormatValue(value)})", value => value > 0 ? Math.Log10(value) : throw new ArgumentOutOfRangeException(nameof(value), "Логарифм определён только для положительных чисел.")));
+        AddButton("1", 1, 5, DigitClick); AddButton("2", 2, 5, DigitClick); AddButton("3", 3, 5, DigitClick); AddButton("+", 4, 5, OperationClick);
+        AddButton("ln", 0, 6, (_, _) => ApplyUnary(value => $"ln({FormatValue(value)})", value => value > 0 ? Math.Log(value) : throw new ArgumentOutOfRangeException(nameof(value), "Логарифм определён только для положительных чисел.")));
+        AddButton("±", 1, 6, (_, _) => ToggleSign()); AddButton("0", 2, 6, DigitClick); AddButton(",", 3, 6, (_, _) => EnterDecimalSeparator());
+        _equalsButton = AddButton("=", 4, 6, EqualsClick);
     }
 
     private void SetConstant(double value, string name)
