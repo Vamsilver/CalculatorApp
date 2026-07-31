@@ -290,32 +290,36 @@ public sealed class CalculatorForm : Form
 
     private void SetToolPanelMode(bool scientific)
     {
-        _scientificToolsRow.Height = scientific ? 94 : 34;
+        _scientificToolsRow.Height = scientific ? 80 : 34;
         _formatBar.Visible = scientific;
         _functionBar.Visible = scientific;
         _scientificTools.RowStyles[0].SizeType = SizeType.Absolute;
-        _scientificTools.RowStyles[0].Height = scientific ? 30 : 34;
+        _scientificTools.RowStyles[0].Height = scientific ? 26 : 34;
         _scientificTools.RowStyles[1].SizeType = SizeType.Absolute;
-        _scientificTools.RowStyles[1].Height = scientific ? 26 : 0;
+        _scientificTools.RowStyles[1].Height = scientific ? 22 : 0;
         _scientificTools.RowStyles[2].SizeType = SizeType.Percent;
         _scientificTools.RowStyles[2].Height = scientific ? 100 : 0;
     }
 
-    private static Button ToolButton(string text, EventHandler handler, bool wide = false)
+    private Button ToolButton(string text, EventHandler handler, bool wide = false)
     {
         var button = new Button
         {
             Text = text,
             Dock = wide ? DockStyle.None : DockStyle.Fill,
             AutoSize = wide,
-            Height = 34,
+            Height = wide ? 30 : 22,
             FlatStyle = FlatStyle.Flat,
             Font = new Font("Segoe UI", 9F),
             Margin = new Padding(2, 1, 2, 1),
             Padding = wide ? new Padding(6, 0, 6, 0) : Padding.Empty
         };
         button.FlatAppearance.BorderSize = 0;
-        button.Click += handler;
+        button.Click += (sender, args) =>
+        {
+            if (_sidebarOpen || _historyOpen) return;
+            handler(sender, args);
+        };
         return button;
     }
 
@@ -792,7 +796,7 @@ public sealed class CalculatorForm : Form
         };
         button.MouseDown += (_, e) =>
         {
-            if (e.Button != MouseButtons.Left) return;
+            if (e.Button != MouseButtons.Left || _sidebarOpen || _historyOpen) return;
             _buttonAnimations.Remove(button);
             var pressed = Blend(GetButtonBaseColor(button), _darkTheme ? Color.White : Color.Black, 0.14);
             button.BackColor = pressed;
@@ -805,7 +809,11 @@ public sealed class CalculatorForm : Form
             ActiveControl = null;
         };
         button.MouseLeave += (_, _) => StartButtonAnimation(button, GetButtonBaseColor(button));
-        button.Click += handler;
+        button.Click += (sender, args) =>
+        {
+            if (_sidebarOpen || _historyOpen) return;
+            handler(sender, args);
+        };
         _keypad.Controls.Add(button, column, row);
         if (span > 1) _keypad.SetColumnSpan(button, span);
         return button;
@@ -871,7 +879,7 @@ public sealed class CalculatorForm : Form
         _displayFadeFrame++;
         var progress = Math.Clamp(_displayFadeFrame / (double)duration, 0, 1);
         var eased = 1 - Math.Pow(1 - progress, 3);
-        var foreground = _darkTheme ? Color.WhiteSmoke : SystemColors.ControlText;
+        var foreground = _darkTheme ? Color.FromArgb(220, 220, 220) : SystemColors.ControlText;
         _display.ForeColor = Blend(_display.BackColor, foreground, 0.42 + eased * 0.58);
         if (progress < 1) return;
         _display.ForeColor = foreground;
@@ -882,8 +890,6 @@ public sealed class CalculatorForm : Form
     {
         var overlayOpen = _sidebarOpen || _historyOpen;
         _targetDimAmount = overlayOpen ? 0.24 : 0;
-        _keypad.Enabled = !overlayOpen;
-        _scientificTools.Enabled = !overlayOpen;
         _dimmingTimer.Start();
     }
 
@@ -1256,7 +1262,7 @@ public sealed class CalculatorForm : Form
         _interactionTimer.Stop();
         _displayFadeTimer.Stop();
         var background = _darkTheme ? Color.FromArgb(32, 32, 32) : Color.FromArgb(243, 243, 243);
-        var foreground = _darkTheme ? Color.WhiteSmoke : SystemColors.ControlText;
+        var foreground = _darkTheme ? Color.FromArgb(220, 220, 220) : SystemColors.ControlText;
         ApplyColors(this, background, foreground);
         _display.BackColor = background;
         _display.ForeColor = foreground;
