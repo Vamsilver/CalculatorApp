@@ -17,7 +17,6 @@ public sealed class CalculatorForm : Form
     private readonly Button _menuButton = new();
     private readonly System.Windows.Forms.Timer _sidebarTimer = new() { Interval = 15 };
     private readonly System.Windows.Forms.Timer _historyTimer = new() { Interval = 15 };
-    private ColumnStyle _sidebarColumn = null!;
     private RowStyle _historyRow = null!;
     private bool _sidebarOpen;
     private bool _historyOpen;
@@ -44,10 +43,8 @@ public sealed class CalculatorForm : Form
     {
         _root.Dock = DockStyle.Fill;
         _root.Padding = new Padding(8);
-        _root.ColumnCount = 2;
+        _root.ColumnCount = 1;
         _root.RowCount = 3;
-        _sidebarColumn = new ColumnStyle(SizeType.Absolute, 0);
-        _root.ColumnStyles.Add(_sidebarColumn);
         _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 125));
         _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -55,15 +52,21 @@ public sealed class CalculatorForm : Form
         _root.RowStyles.Add(_historyRow);
         Controls.Add(_root);
 
-        _sidePanel.Dock = DockStyle.Fill;
+        _sidePanel.Location = Point.Empty;
+        _sidePanel.Size = new Size(0, ClientSize.Height);
+        _sidePanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
         _sidePanel.FlowDirection = FlowDirection.TopDown;
         _sidePanel.WrapContents = false;
-        _sidePanel.Margin = new Padding(0, 0, 6, 0);
-        _sidePanel.Padding = new Padding(3, 8, 3, 3);
+        _sidePanel.Margin = Padding.Empty;
+        _sidePanel.Padding = new Padding(6, 12, 6, 3);
+        _sidePanel.BorderStyle = BorderStyle.FixedSingle;
+        var closeButton = IconButton("\uE700", (_, _) => ToggleSidebar());
+        _toolTip.SetToolTip(closeButton, "Закрыть боковую панель");
         var saveButton = IconButton("\uE74E", SaveHistory);
         var loadButton = IconButton("\uE896", LoadHistory);
         _toolTip.SetToolTip(saveButton, "Сохранить историю");
         _toolTip.SetToolTip(loadButton, "Загрузить историю");
+        _sidePanel.Controls.Add(closeButton);
         _sidePanel.Controls.Add(saveButton);
         _sidePanel.Controls.Add(loadButton);
         _themeButton.Text = "\uE708";
@@ -74,8 +77,7 @@ public sealed class CalculatorForm : Form
         _themeButton.Click += (_, _) => { _darkTheme = !_darkTheme; ApplyTheme(); };
         _toolTip.SetToolTip(_themeButton, "Включить тёмную тему");
         _sidePanel.Controls.Add(_themeButton);
-        _root.Controls.Add(_sidePanel, 0, 0);
-        _root.SetRowSpan(_sidePanel, 3);
+        Controls.Add(_sidePanel);
 
         _display.Text = "0";
         _display.ReadOnly = true;
@@ -129,7 +131,7 @@ public sealed class CalculatorForm : Form
 
         displayPanel.Controls.Add(_display, 0, 1);
         displayPanel.SetColumnSpan(_display, 3);
-        _root.Controls.Add(displayPanel, 1, 0);
+        _root.Controls.Add(displayPanel, 0, 0);
 
         _keypad.Dock = DockStyle.Fill;
         _keypad.ColumnCount = 4;
@@ -137,7 +139,7 @@ public sealed class CalculatorForm : Form
         for (var i = 0; i < 4; i++) _keypad.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
         for (var i = 0; i < 6; i++) _keypad.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / 6));
         _keypad.Margin = Padding.Empty;
-        _root.Controls.Add(_keypad, 1, 1);
+        _root.Controls.Add(_keypad, 0, 1);
 
         AddButton("%", 0, 0, (_, _) => ApplyUnary(value => $"{CalculatorEngine.Format(value)}%", value => value / 100));
         AddButton("CE", 1, 0, (_, _) => ClearEntry());
@@ -177,7 +179,8 @@ public sealed class CalculatorForm : Form
             e.SuppressKeyPress = true;
         };
         _historyPanel.Controls.Add(_history, 0, 1);
-        _root.Controls.Add(_historyPanel, 1, 2);
+        _root.Controls.Add(_historyPanel, 0, 2);
+        _sidePanel.BringToFront();
     }
 
     private void ToggleHistory()
@@ -286,22 +289,22 @@ public sealed class CalculatorForm : Form
 
     private void AnimateSidebar(object? sender, EventArgs e)
     {
-        const float expandedWidth = 58;
+        const float expandedWidth = 62;
         const float step = 6;
         var target = _sidebarOpen ? expandedWidth : 0;
-        var current = _sidebarColumn.Width;
+        var current = _sidePanel.Width;
 
         if (Math.Abs(current - target) <= step)
         {
-            _sidebarColumn.Width = target;
+            _sidePanel.Width = (int)target;
             _sidebarTimer.Stop();
         }
         else
         {
-            _sidebarColumn.Width = current + (_sidebarOpen ? step : -step);
+            _sidePanel.Width = (int)(current + (_sidebarOpen ? step : -step));
         }
 
-        _root.PerformLayout();
+        _sidePanel.BringToFront();
     }
 
     private static Button IconButton(string icon, EventHandler handler)
