@@ -135,12 +135,12 @@ public sealed class CalculatorForm : Form
         _keypad.Margin = Padding.Empty;
         _root.Controls.Add(_keypad, 1, 1);
 
-        AddButton("%", 0, 0, (_, _) => ApplyUnary(value => value / 100));
+        AddButton("%", 0, 0, (_, _) => ApplyUnary(value => $"{CalculatorEngine.Format(value)}%", value => value / 100));
         AddButton("CE", 1, 0, (_, _) => ClearEntry());
         AddButton("C", 2, 0, (_, _) => ClearAll());
         AddButton("⌫", 3, 0, (_, _) => Backspace());
-        AddButton("1/x", 0, 1, (_, _) => ApplyUnary(value => value == 0 ? throw new DivideByZeroException("Деление на ноль невозможно.") : 1 / value));
-        AddButton("x²", 1, 1, (_, _) => ApplyUnary(value => value * value));
+        AddButton("1/x", 0, 1, (_, _) => ApplyUnary(value => $"1/{CalculatorEngine.Format(value)}", value => value == 0 ? throw new DivideByZeroException("Деление на ноль невозможно.") : 1 / value));
+        AddButton("x²", 1, 1, (_, _) => ApplyUnary(value => $"{CalculatorEngine.Format(value)}²", value => value * value));
         AddButton("²√x", 2, 1, (_, _) => ApplySquareRoot());
         AddButton("÷", 3, 1, OperationClick);
         AddButton("7", 0, 2, DigitClick); AddButton("8", 1, 2, DigitClick); AddButton("9", 2, 2, DigitClick); AddButton("×", 3, 2, OperationClick);
@@ -243,12 +243,16 @@ public sealed class CalculatorForm : Form
         _startNewNumber = true;
     }
 
-    private void ApplyUnary(Func<decimal, decimal> operation)
+    private void ApplyUnary(Func<decimal, string> expression, Func<decimal, decimal> operation)
     {
         if (!TryReadDisplay(out var value)) return;
         try
         {
-            _display.Text = CalculatorEngine.Format(operation(value));
+            var result = operation(value);
+            var operationText = expression(value);
+            _display.Text = CalculatorEngine.Format(result);
+            _expressionLabel.Text = $"{operationText} =";
+            AddHistoryEntry($"{operationText} = {_display.Text}");
             _startNewNumber = true;
         }
         catch (Exception ex) when (ex is DivideByZeroException or OverflowException)
@@ -267,6 +271,8 @@ public sealed class CalculatorForm : Form
         }
 
         _display.Text = CalculatorEngine.Format((decimal)Math.Sqrt((double)value));
+        _expressionLabel.Text = $"√{CalculatorEngine.Format(value)} =";
+        AddHistoryEntry($"√{CalculatorEngine.Format(value)} = {_display.Text}");
         _startNewNumber = true;
     }
 
@@ -301,9 +307,13 @@ public sealed class CalculatorForm : Form
     {
         if (!TryReadDisplay(out var value)) return;
         var operation = ((Button)sender!).Text;
+        var previousValue = _engine.Result;
+        var previousOperation = _engine.PendingOperation;
         try
         {
             _display.Text = CalculatorEngine.Format(_engine.SelectOperation(value, operation));
+            if (previousValue is not null && previousOperation is not null)
+                AddHistoryEntry($"{CalculatorEngine.Format(previousValue.Value)} {previousOperation} {CalculatorEngine.Format(value)} = {_display.Text}");
             _expressionLabel.Text = $"{_display.Text} {operation}";
             _startNewNumber = true;
         }
@@ -325,8 +335,7 @@ public sealed class CalculatorForm : Form
             if (left is not null && operation is not null)
             {
                 _expressionLabel.Text = $"{CalculatorEngine.Format(left.Value)} {operation} {CalculatorEngine.Format(value)} =";
-                _history.Items.Add($"{CalculatorEngine.Format(left.Value)} {operation} {CalculatorEngine.Format(value)} = {_display.Text}");
-                _history.TopIndex = _history.Items.Count - 1;
+                AddHistoryEntry($"{CalculatorEngine.Format(left.Value)} {operation} {CalculatorEngine.Format(value)} = {_display.Text}");
             }
             _startNewNumber = true;
         }
@@ -356,6 +365,12 @@ public sealed class CalculatorForm : Form
         _display.Text = "0";
         _expressionLabel.Text = string.Empty;
         _startNewNumber = true;
+    }
+
+    private void AddHistoryEntry(string entry)
+    {
+        _history.Items.Add(entry);
+        _history.TopIndex = _history.Items.Count - 1;
     }
 
     private void SaveHistory(object? sender, EventArgs e)
