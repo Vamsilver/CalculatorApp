@@ -45,6 +45,7 @@ public sealed class CalculatorForm : Form
     private bool _applyingTheme;
     private double _dimAmount;
     private double _targetDimAmount;
+    private bool _pendingKeypadEntrance;
 
     private sealed class ButtonAnimation(Color start, Color end, int frame, int duration)
     {
@@ -333,8 +334,15 @@ public sealed class CalculatorForm : Form
         if (scientific) BuildScientificKeypad();
         else BuildStandardKeypad();
         ApplyTheme();
-        AnimateKeypadEntrance();
-        if (_sidebarOpen) ToggleSidebar();
+        if (_sidebarOpen)
+        {
+            _pendingKeypadEntrance = true;
+            ToggleSidebar();
+        }
+        else
+        {
+            AnimateKeypadEntrance();
+        }
     }
 
     private void ConfigureKeypad(int columns, int rows)
@@ -771,9 +779,11 @@ public sealed class CalculatorForm : Form
             Padding = new Padding(0, 0, 0, 2),
             UseCompatibleTextRendering = false,
             FlatStyle = FlatStyle.Flat,
+            TabStop = false,
+            CausesValidation = false,
             Cursor = Cursors.Hand
         };
-        button.FlatAppearance.BorderSize = 1;
+        button.FlatAppearance.BorderSize = 0;
         button.Resize += (_, _) =>
         {
             RoundButton(button, 5);
@@ -788,7 +798,11 @@ public sealed class CalculatorForm : Form
             button.FlatAppearance.MouseDownBackColor = pressed;
             button.FlatAppearance.MouseOverBackColor = pressed;
         };
-        button.MouseUp += (_, _) => StartButtonAnimation(button, GetButtonHoverColor(button));
+        button.MouseUp += (_, _) =>
+        {
+            StartButtonAnimation(button, GetButtonHoverColor(button));
+            ActiveControl = null;
+        };
         button.MouseLeave += (_, _) => StartButtonAnimation(button, GetButtonBaseColor(button));
         button.Click += handler;
         _keypad.Controls.Add(button, column, row);
@@ -887,6 +901,11 @@ public sealed class CalculatorForm : Form
         }
 
         ApplyRootDimming();
+        if (_dimAmount <= 0 && _pendingKeypadEntrance)
+        {
+            _pendingKeypadEntrance = false;
+            AnimateKeypadEntrance();
+        }
     }
 
     private void ApplyRootDimming()
