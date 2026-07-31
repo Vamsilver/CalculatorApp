@@ -26,6 +26,7 @@ public sealed class CalculatorForm : Form
     private readonly System.Windows.Forms.Timer _historyTimer = new() { Interval = 15 };
     private readonly System.Windows.Forms.Timer _interactionTimer = new() { Interval = 16 };
     private readonly System.Windows.Forms.Timer _displayFadeTimer = new() { Interval = 16 };
+    private readonly System.Windows.Forms.Timer _dimmingTimer = new() { Interval = 16 };
     private readonly Dictionary<Button, ButtonAnimation> _buttonAnimations = new();
     private RowStyle _scientificToolsRow = null!;
     private bool _sidebarOpen;
@@ -42,6 +43,8 @@ public sealed class CalculatorForm : Form
     private bool _expressionHasCurrentValue;
     private int _displayFadeFrame;
     private bool _applyingTheme;
+    private double _dimAmount;
+    private double _targetDimAmount;
 
     private sealed class ButtonAnimation(Color start, Color end, int frame, int duration)
     {
@@ -67,6 +70,7 @@ public sealed class CalculatorForm : Form
         _historyTimer.Tick += AnimateHistory;
         _interactionTimer.Tick += AnimateInteractions;
         _displayFadeTimer.Tick += AnimateDisplay;
+        _dimmingTimer.Tick += AnimateDimming;
         Resize += (_, _) => LayoutHistoryPanel();
         ApplyTheme();
         AnimateKeypadEntrance();
@@ -561,6 +565,7 @@ public sealed class CalculatorForm : Form
     private void ToggleHistory()
     {
         _historyOpen = !_historyOpen;
+        UpdateDimmingTarget();
         if (_historyOpen)
         {
             _historyPanel.Visible = true;
@@ -631,6 +636,7 @@ public sealed class CalculatorForm : Form
         if (_historyOpen)
         {
             _historyOpen = false;
+            UpdateDimmingTarget();
             _historyTimer.Start();
         }
     }
@@ -679,6 +685,7 @@ public sealed class CalculatorForm : Form
     private void ToggleSidebar()
     {
         _sidebarOpen = !_sidebarOpen;
+        UpdateDimmingTarget();
         _sidebarTimer.Start();
         _toolTip.SetToolTip(_menuButton, _sidebarOpen ? "Закрыть боковую панель" : "Открыть боковую панель");
     }
@@ -854,6 +861,62 @@ public sealed class CalculatorForm : Form
         if (progress < 1) return;
         _display.ForeColor = foreground;
         _displayFadeTimer.Stop();
+    }
+
+    private void UpdateDimmingTarget()
+    {
+        var overlayOpen = _sidebarOpen || _historyOpen;
+        _targetDimAmount = overlayOpen ? 0.24 : 0;
+        _keypad.Enabled = !overlayOpen;
+        _scientificTools.Enabled = !overlayOpen;
+        _dimmingTimer.Start();
+    }
+
+    private void AnimateDimming(object? sender, EventArgs e)
+    {
+        const double step = 0.035;
+        var difference = _targetDimAmount - _dimAmount;
+        if (Math.Abs(difference) <= step)
+        {
+            _dimAmount = _targetDimAmount;
+            _dimmingTimer.Stop();
+        }
+        else
+        {
+            _dimAmount += Math.Sign(difference) * step;
+        }
+
+        ApplyRootDimming();
+    }
+
+    private void ApplyRootDimming()
+    {
+        var baseBackground = _darkTheme ? Color.FromArgb(32, 32, 32) : Color.FromArgb(243, 243, 243);
+        var dimmedBackground = Blend(baseBackground, Color.Black, _dimAmount);
+        SetBackgroundRecursive(_root, dimmedBackground);
+
+        foreach (var button in _keypad.Controls.OfType<Button>())
+        {
+            var color = Blend(GetButtonBaseColor(button), Color.Black, _dimAmount);
+            button.BackColor = color;
+            button.FlatAppearance.MouseOverBackColor = _dimAmount <= 0
+                ? GetButtonHoverColor(button)
+                : color;
+        }
+        foreach (var button in DescendantButtons(_scientificTools))
+        {
+            button.BackColor = dimmedBackground;
+            button.FlatAppearance.MouseOverBackColor = _dimAmount <= 0
+                ? (_darkTheme ? Color.FromArgb(55, 55, 55) : Color.FromArgb(229, 229, 229))
+                : dimmedBackground;
+        }
+    }
+
+    private static void SetBackgroundRecursive(Control parent, Color color)
+    {
+        parent.BackColor = color;
+        foreach (Control child in parent.Controls)
+            SetBackgroundRecursive(child, color);
     }
 
     private Color GetButtonBaseColor(Button button) => (button.Tag as string) switch
@@ -1207,6 +1270,7 @@ public sealed class CalculatorForm : Form
             ? Color.FromArgb(62, 67, 77)
             : Color.FromArgb(225, 225, 225);
         _toolTip.SetToolTip(_themeButton, _darkTheme ? "Включить светлую тему" : "Включить тёмную тему");
+        ApplyRootDimming();
         _applyingTheme = false;
     }
 
