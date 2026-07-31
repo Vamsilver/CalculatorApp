@@ -51,6 +51,9 @@ public sealed class CalculatorEngine
             "+" => left + right,
             "−" => left - right,
             "×" => left * right,
+            "^" => Math.Pow(left, right),
+            "mod" when right == 0 => throw new DivideByZeroException("Деление на ноль невозможно."),
+            "mod" => left % right,
             "÷" when right == 0 => throw new DivideByZeroException("Деление на ноль невозможно."),
             "÷" => left / right,
             _ => throw new ArgumentException("Неизвестная операция.", nameof(operation))
@@ -74,7 +77,7 @@ public sealed class CalculatorEngine
 
     private static void ValidateOperation(string operation)
     {
-        if (operation is not ("+" or "−" or "×" or "÷"))
+        if (operation is not ("+" or "−" or "×" or "÷" or "^" or "mod"))
             throw new ArgumentException("Неизвестная операция.", nameof(operation));
     }
 }

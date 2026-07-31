@@ -6,6 +6,7 @@ public sealed class CalculatorForm : Form
 {
     private readonly CalculatorEngine _engine = new();
     private readonly TextBox _display = new();
+    private readonly Label _modeLabel = new();
     private readonly Label _expressionLabel = new();
     private readonly ListBox _history = new();
     private readonly TableLayoutPanel _historyPanel = new();
@@ -21,6 +22,8 @@ public sealed class CalculatorForm : Form
     private bool _sidebarOpen;
     private bool _historyOpen;
     private bool _fittingDisplay;
+    private bool _scientificMode;
+    private bool _degreesMode = true;
     private Button _equalsButton = null!;
     private bool _startNewNumber = true;
     private bool _darkTheme;
@@ -62,12 +65,18 @@ public sealed class CalculatorForm : Form
         _sidePanel.BorderStyle = BorderStyle.FixedSingle;
         var closeButton = SidebarButton("\uE700", "Калькулятор", (_, _) => ToggleSidebar());
         _toolTip.SetToolTip(closeButton, "Закрыть боковую панель");
+        var modeSection = SidebarSection("РЕЖИМ");
+        var standardButton = SidebarButton("\uE8EF", "Обычный", (_, _) => SwitchMode(false));
+        var scientificButton = SidebarButton("\uE9D9", "Инженерный", (_, _) => SwitchMode(true));
         var fileSection = SidebarSection("ФАЙЛ И ИСТОРИЯ");
         var saveButton = SidebarButton("\uE74E", "Сохранить историю", SaveHistory);
         var loadButton = SidebarButton("\uE896", "Загрузить историю", LoadHistory);
         _toolTip.SetToolTip(saveButton, "Сохранить историю");
         _toolTip.SetToolTip(loadButton, "Загрузить историю");
         _sidePanel.Controls.Add(closeButton);
+        _sidePanel.Controls.Add(modeSection);
+        _sidePanel.Controls.Add(standardButton);
+        _sidePanel.Controls.Add(scientificButton);
         _sidePanel.Controls.Add(fileSection);
         _sidePanel.Controls.Add(saveButton);
         _sidePanel.Controls.Add(loadButton);
@@ -104,12 +113,13 @@ public sealed class CalculatorForm : Form
             Dock = DockStyle.Fill,
             Margin = Padding.Empty,
             ColumnCount = 3,
-            RowCount = 2
+            RowCount = 3
         };
         displayPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 46));
         displayPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         displayPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 46));
-        displayPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+        displayPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+        displayPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
         displayPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _menuButton.Text = "\uE700";
         _menuButton.Font = new Font("Segoe Fluent Icons", 17F);
@@ -120,13 +130,20 @@ public sealed class CalculatorForm : Form
         _toolTip.SetToolTip(_menuButton, "Открыть боковую панель");
         displayPanel.Controls.Add(_menuButton, 0, 0);
 
+        _modeLabel.Text = "Обычный";
+        _modeLabel.TextAlign = ContentAlignment.MiddleLeft;
+        _modeLabel.Dock = DockStyle.Fill;
+        _modeLabel.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+        displayPanel.Controls.Add(_modeLabel, 1, 0);
+
         _expressionLabel.Text = string.Empty;
         _expressionLabel.TextAlign = ContentAlignment.MiddleRight;
         _expressionLabel.Dock = DockStyle.Fill;
         _expressionLabel.Font = new Font("Segoe UI", 10F);
         _expressionLabel.ForeColor = Color.DimGray;
         _expressionLabel.AutoEllipsis = true;
-        displayPanel.Controls.Add(_expressionLabel, 1, 0);
+        displayPanel.Controls.Add(_expressionLabel, 1, 1);
+        displayPanel.SetColumnSpan(_expressionLabel, 2);
 
         var historyButton = new Button
         {
@@ -140,31 +157,14 @@ public sealed class CalculatorForm : Form
         _toolTip.SetToolTip(historyButton, "Показать историю");
         displayPanel.Controls.Add(historyButton, 2, 0);
 
-        displayPanel.Controls.Add(_display, 0, 1);
+        displayPanel.Controls.Add(_display, 0, 2);
         displayPanel.SetColumnSpan(_display, 3);
         _root.Controls.Add(displayPanel, 0, 0);
 
         _keypad.Dock = DockStyle.Fill;
-        _keypad.ColumnCount = 4;
-        _keypad.RowCount = 6;
-        for (var i = 0; i < 4; i++) _keypad.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-        for (var i = 0; i < 6; i++) _keypad.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / 6));
         _keypad.Margin = Padding.Empty;
         _root.Controls.Add(_keypad, 0, 1);
-
-        AddButton("%", 0, 0, (_, _) => ApplyUnary(value => $"{CalculatorEngine.Format(value)}%", value => value / 100));
-        AddButton("CE", 1, 0, (_, _) => ClearEntry());
-        AddButton("C", 2, 0, (_, _) => ClearAll());
-        AddButton("⌫", 3, 0, (_, _) => Backspace());
-        AddButton("1/x", 0, 1, (_, _) => ApplyUnary(value => $"1/{CalculatorEngine.Format(value)}", value => value == 0 ? throw new DivideByZeroException("Деление на ноль невозможно.") : 1 / value));
-        AddButton("x²", 1, 1, (_, _) => ApplyUnary(value => $"{CalculatorEngine.Format(value)}²", value => value * value));
-        AddButton("²√x", 2, 1, (_, _) => ApplySquareRoot());
-        AddButton("÷", 3, 1, OperationClick);
-        AddButton("7", 0, 2, DigitClick); AddButton("8", 1, 2, DigitClick); AddButton("9", 2, 2, DigitClick); AddButton("×", 3, 2, OperationClick);
-        AddButton("4", 0, 3, DigitClick); AddButton("5", 1, 3, DigitClick); AddButton("6", 2, 3, DigitClick); AddButton("−", 3, 3, OperationClick);
-        AddButton("1", 0, 4, DigitClick); AddButton("2", 1, 4, DigitClick); AddButton("3", 2, 4, DigitClick); AddButton("+", 3, 4, OperationClick);
-        AddButton("±", 0, 5, (_, _) => ToggleSign()); AddButton("0", 1, 5, DigitClick); AddButton(",", 2, 5, (_, _) => EnterDecimalSeparator());
-        _equalsButton = AddButton("=", 3, 5, EqualsClick);
+        BuildStandardKeypad();
 
         _historyPanel.Dock = DockStyle.Fill;
         _historyPanel.RowCount = 2;
@@ -192,6 +192,95 @@ public sealed class CalculatorForm : Form
         _historyPanel.Controls.Add(_history, 0, 1);
         _root.Controls.Add(_historyPanel, 0, 2);
         _sidePanel.BringToFront();
+    }
+
+    private void SwitchMode(bool scientific)
+    {
+        if (_scientificMode == scientific)
+        {
+            if (_sidebarOpen) ToggleSidebar();
+            return;
+        }
+
+        _scientificMode = scientific;
+        _modeLabel.Text = scientific ? "Инженерный" : "Обычный";
+        ClearAll();
+        if (scientific) BuildScientificKeypad();
+        else BuildStandardKeypad();
+        ApplyTheme();
+        if (_sidebarOpen) ToggleSidebar();
+    }
+
+    private void ConfigureKeypad(int columns, int rows)
+    {
+        while (_keypad.Controls.Count > 0)
+            _keypad.Controls[0].Dispose();
+        _keypad.ColumnStyles.Clear();
+        _keypad.RowStyles.Clear();
+        _keypad.ColumnCount = columns;
+        _keypad.RowCount = rows;
+        for (var i = 0; i < columns; i++)
+            _keypad.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F / columns));
+        for (var i = 0; i < rows; i++)
+            _keypad.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / rows));
+    }
+
+    private void BuildStandardKeypad()
+    {
+        ConfigureKeypad(4, 6);
+        AddButton("%", 0, 0, (_, _) => ApplyUnary(value => $"{CalculatorEngine.Format(value)}%", value => value / 100));
+        AddButton("CE", 1, 0, (_, _) => ClearEntry()); AddButton("C", 2, 0, (_, _) => ClearAll()); AddButton("⌫", 3, 0, (_, _) => Backspace());
+        AddButton("1/x", 0, 1, (_, _) => ApplyUnary(value => $"1/{CalculatorEngine.Format(value)}", value => value == 0 ? throw new DivideByZeroException("Деление на ноль невозможно.") : 1 / value));
+        AddButton("x²", 1, 1, (_, _) => ApplyUnary(value => $"{CalculatorEngine.Format(value)}²", value => value * value));
+        AddButton("²√x", 2, 1, (_, _) => ApplySquareRoot()); AddButton("÷", 3, 1, OperationClick);
+        AddButton("7", 0, 2, DigitClick); AddButton("8", 1, 2, DigitClick); AddButton("9", 2, 2, DigitClick); AddButton("×", 3, 2, OperationClick);
+        AddButton("4", 0, 3, DigitClick); AddButton("5", 1, 3, DigitClick); AddButton("6", 2, 3, DigitClick); AddButton("−", 3, 3, OperationClick);
+        AddButton("1", 0, 4, DigitClick); AddButton("2", 1, 4, DigitClick); AddButton("3", 2, 4, DigitClick); AddButton("+", 3, 4, OperationClick);
+        AddButton("±", 0, 5, (_, _) => ToggleSign()); AddButton("0", 1, 5, DigitClick); AddButton(",", 2, 5, (_, _) => EnterDecimalSeparator());
+        _equalsButton = AddButton("=", 3, 5, EqualsClick);
+    }
+
+    private void BuildScientificKeypad()
+    {
+        ConfigureKeypad(5, 7);
+        Button? angleButton = null;
+        angleButton = AddButton(_degreesMode ? "DEG" : "RAD", 0, 0, (_, _) =>
+        {
+            _degreesMode = !_degreesMode;
+            angleButton!.Text = _degreesMode ? "DEG" : "RAD";
+        });
+        AddButton("π", 1, 0, (_, _) => SetConstant(Math.PI, "π")); AddButton("e", 2, 0, (_, _) => SetConstant(Math.E, "e"));
+        AddButton("C", 3, 0, (_, _) => ClearAll()); AddButton("⌫", 4, 0, (_, _) => Backspace());
+        AddButton("x²", 0, 1, (_, _) => ApplyUnary(value => $"{CalculatorEngine.Format(value)}²", value => value * value));
+        AddButton("1/x", 1, 1, (_, _) => ApplyUnary(value => $"1/{CalculatorEngine.Format(value)}", value => value == 0 ? throw new DivideByZeroException("Деление на ноль невозможно.") : 1 / value));
+        AddButton("|x|", 2, 1, (_, _) => ApplyUnary(value => $"|{CalculatorEngine.Format(value)}|", Math.Abs));
+        AddButton("exp", 3, 1, (_, _) => ApplyUnary(value => $"exp({CalculatorEngine.Format(value)})", Math.Exp));
+        AddButton("mod", 4, 1, (_, _) => ExecuteOperation("mod"));
+        AddButton("²√x", 0, 2, (_, _) => ApplySquareRoot());
+        AddButton("sin", 1, 2, (_, _) => ApplyTrig("sin", Math.Sin)); AddButton("cos", 2, 2, (_, _) => ApplyTrig("cos", Math.Cos));
+        AddButton("tan", 3, 2, (_, _) => ApplyTrig("tan", Math.Tan)); AddButton("÷", 4, 2, OperationClick);
+        AddButton("xʸ", 0, 3, (_, _) => ExecuteOperation("^")); AddButton("7", 1, 3, DigitClick); AddButton("8", 2, 3, DigitClick); AddButton("9", 3, 3, DigitClick); AddButton("×", 4, 3, OperationClick);
+        AddButton("10ˣ", 0, 4, (_, _) => ApplyUnary(value => $"10^{CalculatorEngine.Format(value)}", value => Math.Pow(10, value)));
+        AddButton("4", 1, 4, DigitClick); AddButton("5", 2, 4, DigitClick); AddButton("6", 3, 4, DigitClick); AddButton("−", 4, 4, OperationClick);
+        AddButton("log", 0, 5, (_, _) => ApplyUnary(value => $"log({CalculatorEngine.Format(value)})", value => value > 0 ? Math.Log10(value) : throw new ArgumentOutOfRangeException(nameof(value), "Логарифм определён только для положительных чисел.")));
+        AddButton("1", 1, 5, DigitClick); AddButton("2", 2, 5, DigitClick); AddButton("3", 3, 5, DigitClick); AddButton("+", 4, 5, OperationClick);
+        AddButton("ln", 0, 6, (_, _) => ApplyUnary(value => $"ln({CalculatorEngine.Format(value)})", value => value > 0 ? Math.Log(value) : throw new ArgumentOutOfRangeException(nameof(value), "Логарифм определён только для положительных чисел.")));
+        AddButton("±", 1, 6, (_, _) => ToggleSign()); AddButton("0", 2, 6, DigitClick); AddButton(",", 3, 6, (_, _) => EnterDecimalSeparator());
+        _equalsButton = AddButton("=", 4, 6, EqualsClick);
+    }
+
+    private void SetConstant(double value, string name)
+    {
+        _display.Text = CalculatorEngine.Format(value);
+        _expressionLabel.Text = name;
+        _startNewNumber = true;
+    }
+
+    private void ApplyTrig(string name, Func<double, double> operation)
+    {
+        ApplyUnary(
+            value => $"{name}({CalculatorEngine.Format(value)}{(_degreesMode ? "°" : string.Empty)})",
+            value => operation(_degreesMode ? value * Math.PI / 180 : value));
     }
 
     private void ToggleHistory()
@@ -393,7 +482,7 @@ public sealed class CalculatorForm : Form
             AddHistoryEntry($"{operationText} = {_display.Text}");
             _startNewNumber = true;
         }
-        catch (Exception ex) when (ex is DivideByZeroException or OverflowException)
+        catch (Exception ex) when (ex is DivideByZeroException or OverflowException or ArgumentOutOfRangeException)
         {
             ShowCalculationError(ex.Message);
         }
@@ -442,9 +531,11 @@ public sealed class CalculatorForm : Form
     }
 
     private void OperationClick(object? sender, EventArgs e)
+        => ExecuteOperation(((Button)sender!).Text);
+
+    private void ExecuteOperation(string operation)
     {
         if (!TryReadDisplay(out var value)) return;
-        var operation = ((Button)sender!).Text;
         var previousValue = _engine.Result;
         var previousOperation = _engine.PendingOperation;
         try
