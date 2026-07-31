@@ -250,7 +250,18 @@ public sealed class CalculatorForm : Form
         _root.MouseDown += (_, _) => DismissOpenPanels();
         _keypad.MouseDown += (_, _) => DismissOpenPanels();
         _scientificTools.MouseDown += (_, _) => DismissOpenPanels();
+        WireOverlayDismissal(_root);
         _sidePanel.BringToFront();
+    }
+
+    private void WireOverlayDismissal(Control parent)
+    {
+        foreach (Control child in parent.Controls)
+        {
+            if (child is Button) continue;
+            child.MouseDown += (_, _) => DismissOpenPanels();
+            WireOverlayDismissal(child);
+        }
     }
 
     private void BuildScientificTools()
@@ -274,7 +285,7 @@ public sealed class CalculatorForm : Form
         });
         _formatBar.Controls.Add(angleButton);
         _formatBar.Controls.Add(ToolButton("F-E", (_, _) => ToggleScientificFormat()));
-        _scientificTools.Controls.Add(_formatBar, 0, 1);
+        _scientificTools.Controls.Add(_formatBar, 0, 0);
 
         _memoryBar.Dock = DockStyle.Fill;
         _memoryBar.Margin = Padding.Empty;
@@ -288,7 +299,7 @@ public sealed class CalculatorForm : Form
         _memoryBar.Controls.Add(ToolButton("MS", (_, _) => StoreMemory()), 4, 0);
         _memoryBar.Controls.Add(ToolButton("M⌄", (_, _) => RecallMemory()), 5, 0);
         foreach (var button in _memoryBar.Controls.OfType<Button>()) button.Dock = DockStyle.Fill;
-        _scientificTools.Controls.Add(_memoryBar, 0, 0);
+        _scientificTools.Controls.Add(_memoryBar, 0, 1);
 
         _functionBar.Dock = DockStyle.Fill;
         _functionBar.Margin = Padding.Empty;
@@ -309,9 +320,9 @@ public sealed class CalculatorForm : Form
         _formatBar.Visible = scientific;
         _functionBar.Visible = scientific;
         _scientificTools.RowStyles[0].SizeType = SizeType.Absolute;
-        _scientificTools.RowStyles[0].Height = scientific ? 26 : 34;
+        _scientificTools.RowStyles[0].Height = scientific ? 22 : 0;
         _scientificTools.RowStyles[1].SizeType = SizeType.Absolute;
-        _scientificTools.RowStyles[1].Height = scientific ? 22 : 0;
+        _scientificTools.RowStyles[1].Height = scientific ? 26 : 34;
         _scientificTools.RowStyles[2].SizeType = SizeType.Percent;
         _scientificTools.RowStyles[2].Height = scientific ? 100 : 0;
     }
