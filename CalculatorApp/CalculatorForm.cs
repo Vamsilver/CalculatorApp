@@ -290,13 +290,13 @@ public sealed class CalculatorForm : Form
 
     private void SetToolPanelMode(bool scientific)
     {
-        _scientificToolsRow.Height = scientific ? 108 : 34;
+        _scientificToolsRow.Height = scientific ? 94 : 34;
         _formatBar.Visible = scientific;
         _functionBar.Visible = scientific;
         _scientificTools.RowStyles[0].SizeType = SizeType.Absolute;
-        _scientificTools.RowStyles[0].Height = scientific ? 30 : 0;
+        _scientificTools.RowStyles[0].Height = scientific ? 26 : 0;
         _scientificTools.RowStyles[1].SizeType = SizeType.Absolute;
-        _scientificTools.RowStyles[1].Height = 34;
+        _scientificTools.RowStyles[1].Height = scientific ? 30 : 34;
         _scientificTools.RowStyles[2].SizeType = SizeType.Percent;
         _scientificTools.RowStyles[2].Height = scientific ? 100 : 0;
     }
