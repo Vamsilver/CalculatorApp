@@ -158,10 +158,24 @@ public sealed class CalculatorForm : Form
         _historyPanel.Padding = new Padding(0, 8, 0, 0);
         _historyPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         _historyPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        _historyPanel.Controls.Add(new Label { Text = "История вычислений", Dock = DockStyle.Fill, Font = new Font(Font, FontStyle.Bold) }, 0, 0);
+        _historyPanel.Controls.Add(new Label
+        {
+            Text = "История · двойной щелчок — использовать результат",
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            AutoEllipsis = true
+        }, 0, 0);
         _history.Dock = DockStyle.Fill;
         _history.IntegralHeight = false;
         _history.HorizontalScrollbar = true;
+        _history.DoubleClick += (_, _) => UseSelectedHistoryResult();
+        _history.KeyDown += (_, e) =>
+        {
+            if (e.KeyCode != Keys.Enter) return;
+            UseSelectedHistoryResult();
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+        };
         _historyPanel.Controls.Add(_history, 0, 1);
         _root.Controls.Add(_historyPanel, 1, 2);
     }
@@ -190,6 +204,36 @@ public sealed class CalculatorForm : Form
         }
 
         _root.PerformLayout();
+    }
+
+    private void UseSelectedHistoryResult()
+    {
+        if (_history.SelectedItem is not string entry) return;
+
+        var equalsIndex = entry.LastIndexOf('=');
+        if (equalsIndex < 0) return;
+
+        var resultText = entry[(equalsIndex + 1)..].Trim();
+        var styles = NumberStyles.Float | NumberStyles.AllowThousands;
+        var parsed = double.TryParse(resultText, styles, CultureInfo.CurrentCulture, out var value)
+            || double.TryParse(resultText, styles, CultureInfo.InvariantCulture, out value);
+
+        if (!parsed || !double.IsFinite(value))
+        {
+            MessageBox.Show("Не удалось прочитать результат выбранной операции.", "История", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        _engine.Clear();
+        _display.Text = CalculatorEngine.Format(value);
+        _expressionLabel.Text = "Результат из истории";
+        _startNewNumber = true;
+
+        if (_historyOpen)
+        {
+            _historyOpen = false;
+            _historyTimer.Start();
+        }
     }
 
     private void FitDisplayText()
