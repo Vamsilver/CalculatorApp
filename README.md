@@ -124,7 +124,3 @@ CalculatorApp.sln
 - логарифм неположительного числа;
 - факториал отрицательного, дробного или слишком большого числа;
 - переполнение и нечисловой результат.
-
-## Репозиторий
-
-[github.com/Vamsilver/CalculatorApp](https://github.com/Vamsilver/CalculatorApp)
