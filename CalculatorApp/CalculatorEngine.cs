@@ -44,6 +44,14 @@ public sealed class CalculatorEngine
         _pendingOperation = null;
     }
 
+    public void Restore(double? accumulator, string? pendingOperation)
+    {
+        if (pendingOperation is not null)
+            ValidateOperation(pendingOperation);
+        _accumulator = accumulator;
+        _pendingOperation = pendingOperation;
+    }
+
     public static double Calculate(double left, double right, string operation)
     {
         var result = operation switch
@@ -64,12 +72,12 @@ public sealed class CalculatorEngine
             : throw new OverflowException("Результат выходит за допустимый диапазон чисел.");
     }
 
-    public static string Format(double value)
+    public static string Format(double value, bool forceScientific = false)
     {
         if (value == 0) return "0";
 
         var absolute = Math.Abs(value);
-        var format = absolute >= 1E15 || absolute < 1E-9
+        var format = forceScientific || absolute >= 1E15 || absolute < 1E-9
             ? "0.##############E+0"
             : "0.###############";
         return value.ToString(format, CultureInfo.CurrentCulture);

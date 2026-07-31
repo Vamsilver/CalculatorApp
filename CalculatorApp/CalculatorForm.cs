@@ -24,6 +24,11 @@ public sealed class CalculatorForm : Form
     private bool _fittingDisplay;
     private bool _scientificMode;
     private bool _degreesMode = true;
+    private bool _forceScientific;
+    private bool _secondFunctions;
+    private double _memory;
+    private bool _hasMemory;
+    private readonly Stack<(double? Accumulator, string? Operation)> _parentheses = new();
     private Button _equalsButton = null!;
     private bool _startNewNumber = true;
     private bool _darkTheme;
@@ -242,45 +247,204 @@ public sealed class CalculatorForm : Form
 
     private void BuildScientificKeypad()
     {
-        ConfigureKeypad(5, 7);
+        ConfigureKeypad(5, 9);
         Button? angleButton = null;
         angleButton = AddButton(_degreesMode ? "DEG" : "RAD", 0, 0, (_, _) =>
         {
             _degreesMode = !_degreesMode;
             angleButton!.Text = _degreesMode ? "DEG" : "RAD";
         });
-        AddButton("π", 1, 0, (_, _) => SetConstant(Math.PI, "π")); AddButton("e", 2, 0, (_, _) => SetConstant(Math.E, "e"));
-        AddButton("C", 3, 0, (_, _) => ClearAll()); AddButton("⌫", 4, 0, (_, _) => Backspace());
-        AddButton("x²", 0, 1, (_, _) => ApplyUnary(value => $"{CalculatorEngine.Format(value)}²", value => value * value));
-        AddButton("1/x", 1, 1, (_, _) => ApplyUnary(value => $"1/{CalculatorEngine.Format(value)}", value => value == 0 ? throw new DivideByZeroException("Деление на ноль невозможно.") : 1 / value));
-        AddButton("|x|", 2, 1, (_, _) => ApplyUnary(value => $"|{CalculatorEngine.Format(value)}|", Math.Abs));
-        AddButton("exp", 3, 1, (_, _) => ApplyUnary(value => $"exp({CalculatorEngine.Format(value)})", Math.Exp));
-        AddButton("mod", 4, 1, (_, _) => ExecuteOperation("mod"));
-        AddButton("²√x", 0, 2, (_, _) => ApplySquareRoot());
-        AddButton("sin", 1, 2, (_, _) => ApplyTrig("sin", Math.Sin)); AddButton("cos", 2, 2, (_, _) => ApplyTrig("cos", Math.Cos));
-        AddButton("tan", 3, 2, (_, _) => ApplyTrig("tan", Math.Tan)); AddButton("÷", 4, 2, OperationClick);
-        AddButton("xʸ", 0, 3, (_, _) => ExecuteOperation("^")); AddButton("7", 1, 3, DigitClick); AddButton("8", 2, 3, DigitClick); AddButton("9", 3, 3, DigitClick); AddButton("×", 4, 3, OperationClick);
-        AddButton("10ˣ", 0, 4, (_, _) => ApplyUnary(value => $"10^{CalculatorEngine.Format(value)}", value => Math.Pow(10, value)));
-        AddButton("4", 1, 4, DigitClick); AddButton("5", 2, 4, DigitClick); AddButton("6", 3, 4, DigitClick); AddButton("−", 4, 4, OperationClick);
-        AddButton("log", 0, 5, (_, _) => ApplyUnary(value => $"log({CalculatorEngine.Format(value)})", value => value > 0 ? Math.Log10(value) : throw new ArgumentOutOfRangeException(nameof(value), "Логарифм определён только для положительных чисел.")));
-        AddButton("1", 1, 5, DigitClick); AddButton("2", 2, 5, DigitClick); AddButton("3", 3, 5, DigitClick); AddButton("+", 4, 5, OperationClick);
-        AddButton("ln", 0, 6, (_, _) => ApplyUnary(value => $"ln({CalculatorEngine.Format(value)})", value => value > 0 ? Math.Log(value) : throw new ArgumentOutOfRangeException(nameof(value), "Логарифм определён только для положительных чисел.")));
-        AddButton("±", 1, 6, (_, _) => ToggleSign()); AddButton("0", 2, 6, DigitClick); AddButton(",", 3, 6, (_, _) => EnterDecimalSeparator());
-        _equalsButton = AddButton("=", 4, 6, EqualsClick);
+        AddButton("F-E", 1, 0, (_, _) => ToggleScientificFormat()); AddButton("MC", 2, 0, (_, _) => ClearMemory());
+        AddButton("MR", 3, 0, (_, _) => RecallMemory()); AddButton("MS", 4, 0, (_, _) => StoreMemory());
+        AddButton("M+", 0, 1, (_, _) => ChangeMemory(1)); AddButton("M−", 1, 1, (_, _) => ChangeMemory(-1));
+        AddButton("2nd", 2, 1, (_, _) => { _secondFunctions = !_secondFunctions; BuildScientificKeypad(); ApplyTheme(); });
+        AddButton("π", 3, 1, (_, _) => SetConstant(Math.PI, "π")); AddButton("e", 4, 1, (_, _) => SetConstant(Math.E, "e"));
+        Button? trigButton = null;
+        trigButton = AddButton("Тригонометрия ▼", 0, 2, (_, _) => ShowTrigMenu(trigButton!), 2);
+        Button? functionsButton = null;
+        functionsButton = AddButton("Функции ▼", 2, 2, (_, _) => ShowFunctionsMenu(functionsButton!), 2);
+        AddButton("mod", 4, 2, (_, _) => ExecuteOperation("mod"));
+        AddButton(_secondFunctions ? "x³" : "x²", 0, 3, (_, _) => ApplyUnary(value => $"{FormatValue(value)}{(_secondFunctions ? "³" : "²")}", value => Math.Pow(value, _secondFunctions ? 3 : 2)));
+        AddButton("1/x", 1, 3, (_, _) => ApplyUnary(value => $"1/{FormatValue(value)}", value => value == 0 ? throw new DivideByZeroException("Деление на ноль невозможно.") : 1 / value));
+        AddButton("|x|", 2, 3, (_, _) => ApplyUnary(value => $"|{FormatValue(value)}|", Math.Abs));
+        AddButton("⌊x⌋", 3, 3, (_, _) => ApplyUnary(value => $"floor({FormatValue(value)})", Math.Floor));
+        AddButton("⌈x⌉", 4, 3, (_, _) => ApplyUnary(value => $"ceil({FormatValue(value)})", Math.Ceiling));
+        AddButton(_secondFunctions ? "³√x" : "²√x", 0, 4, (_, _) => ApplyRoot()); AddButton("(", 1, 4, (_, _) => OpenParenthesis());
+        AddButton(")", 2, 4, (_, _) => CloseParenthesis()); AddButton("n!", 3, 4, (_, _) => ApplyFactorial()); AddButton("÷", 4, 4, OperationClick);
+        AddButton("xʸ", 0, 5, (_, _) => ExecuteOperation("^")); AddButton("7", 1, 5, DigitClick); AddButton("8", 2, 5, DigitClick); AddButton("9", 3, 5, DigitClick); AddButton("×", 4, 5, OperationClick);
+        AddButton(_secondFunctions ? "2ˣ" : "10ˣ", 0, 6, (_, _) => ApplyUnary(value => $"{(_secondFunctions ? 2 : 10)}^{FormatValue(value)}", value => Math.Pow(_secondFunctions ? 2 : 10, value)));
+        AddButton("4", 1, 6, DigitClick); AddButton("5", 2, 6, DigitClick); AddButton("6", 3, 6, DigitClick); AddButton("−", 4, 6, OperationClick);
+        AddButton("log", 0, 7, (_, _) => ApplyUnary(value => $"log({FormatValue(value)})", value => value > 0 ? Math.Log10(value) : throw new ArgumentOutOfRangeException(nameof(value), "Логарифм определён только для положительных чисел.")));
+        AddButton("1", 1, 7, DigitClick); AddButton("2", 2, 7, DigitClick); AddButton("3", 3, 7, DigitClick); AddButton("+", 4, 7, OperationClick);
+        AddButton("ln", 0, 8, (_, _) => ApplyUnary(value => $"ln({FormatValue(value)})", value => value > 0 ? Math.Log(value) : throw new ArgumentOutOfRangeException(nameof(value), "Логарифм определён только для положительных чисел.")));
+        AddButton("±", 1, 8, (_, _) => ToggleSign()); AddButton("0", 2, 8, DigitClick); AddButton(",", 3, 8, (_, _) => EnterDecimalSeparator());
+        _equalsButton = AddButton("=", 4, 8, EqualsClick);
     }
 
     private void SetConstant(double value, string name)
     {
-        _display.Text = CalculatorEngine.Format(value);
+        _display.Text = FormatValue(value);
         _expressionLabel.Text = name;
         _startNewNumber = true;
     }
 
-    private void ApplyTrig(string name, Func<double, double> operation)
+    private void ApplyTrig(string name, Func<double, double> operation, bool inverse)
     {
         ApplyUnary(
-            value => $"{name}({CalculatorEngine.Format(value)}{(_degreesMode ? "°" : string.Empty)})",
-            value => operation(_degreesMode ? value * Math.PI / 180 : value));
+            value => $"{name}({FormatValue(value)}{(_degreesMode && !inverse ? "°" : string.Empty)})",
+            value =>
+            {
+                var result = operation(inverse || !_degreesMode ? value : value * Math.PI / 180);
+                return inverse && _degreesMode ? result * 180 / Math.PI : result;
+            });
+    }
+
+    private void ShowTrigMenu(Control owner)
+    {
+        var menu = new ContextMenuStrip();
+        AddMenuFunction(menu, "sin", () => ApplyTrig("sin", Math.Sin, false));
+        AddMenuFunction(menu, "cos", () => ApplyTrig("cos", Math.Cos, false));
+        AddMenuFunction(menu, "tan", () => ApplyTrig("tan", Math.Tan, false));
+        AddMenuFunction(menu, "sec", () => ApplyTrig("sec", value => 1 / Math.Cos(value), false));
+        AddMenuFunction(menu, "csc", () => ApplyTrig("csc", value => 1 / Math.Sin(value), false));
+        AddMenuFunction(menu, "cot", () => ApplyTrig("cot", value => 1 / Math.Tan(value), false));
+        menu.Items.Add(new ToolStripSeparator());
+        AddMenuFunction(menu, "asin", () => ApplyTrig("asin", Math.Asin, true));
+        AddMenuFunction(menu, "acos", () => ApplyTrig("acos", Math.Acos, true));
+        AddMenuFunction(menu, "atan", () => ApplyTrig("atan", Math.Atan, true));
+        menu.Items.Add(new ToolStripSeparator());
+        AddMenuFunction(menu, "sinh", () => ApplyUnary(value => $"sinh({FormatValue(value)})", Math.Sinh));
+        AddMenuFunction(menu, "cosh", () => ApplyUnary(value => $"cosh({FormatValue(value)})", Math.Cosh));
+        AddMenuFunction(menu, "tanh", () => ApplyUnary(value => $"tanh({FormatValue(value)})", Math.Tanh));
+        AddMenuFunction(menu, "asinh", () => ApplyUnary(value => $"asinh({FormatValue(value)})", Math.Asinh));
+        AddMenuFunction(menu, "acosh", () => ApplyUnary(value => $"acosh({FormatValue(value)})", Math.Acosh));
+        AddMenuFunction(menu, "atanh", () => ApplyUnary(value => $"atanh({FormatValue(value)})", Math.Atanh));
+        menu.Show(owner, new Point(0, owner.Height));
+    }
+
+    private void ShowFunctionsMenu(Control owner)
+    {
+        var menu = new ContextMenuStrip();
+        AddMenuFunction(menu, "|x|", () => ApplyUnary(value => $"|{FormatValue(value)}|", Math.Abs));
+        AddMenuFunction(menu, "floor", () => ApplyUnary(value => $"floor({FormatValue(value)})", Math.Floor));
+        AddMenuFunction(menu, "ceil", () => ApplyUnary(value => $"ceil({FormatValue(value)})", Math.Ceiling));
+        AddMenuFunction(menu, "exp", () => ApplyUnary(value => $"exp({FormatValue(value)})", Math.Exp));
+        AddMenuFunction(menu, "rand", () => SetConstant(Random.Shared.NextDouble(), "rand()"));
+        menu.Items.Add(new ToolStripSeparator());
+        AddMenuFunction(menu, "→ DMS", () => ApplyUnary(value => $"dms({FormatValue(value)})", ToDegreesMinutesSeconds));
+        AddMenuFunction(menu, "→ DEG", () => ApplyUnary(value => $"deg({FormatValue(value)})", FromDegreesMinutesSeconds));
+        menu.Show(owner, new Point(0, owner.Height));
+    }
+
+    private static void AddMenuFunction(ContextMenuStrip menu, string text, Action action)
+        => menu.Items.Add(text, null, (_, _) => action());
+
+    private static double ToDegreesMinutesSeconds(double value)
+    {
+        var sign = Math.Sign(value);
+        var absolute = Math.Abs(value);
+        var degrees = Math.Floor(absolute);
+        var minutesValue = (absolute - degrees) * 60;
+        var minutes = Math.Floor(minutesValue);
+        var seconds = (minutesValue - minutes) * 60;
+        return sign * (degrees + minutes / 100 + seconds / 10000);
+    }
+
+    private static double FromDegreesMinutesSeconds(double value)
+    {
+        var sign = Math.Sign(value);
+        var absolute = Math.Abs(value);
+        var degrees = Math.Floor(absolute);
+        var minutesAndSeconds = (absolute - degrees) * 100;
+        var minutes = Math.Floor(minutesAndSeconds);
+        var seconds = (minutesAndSeconds - minutes) * 100;
+        return sign * (degrees + minutes / 60 + seconds / 3600);
+    }
+
+    private string FormatValue(double value) => CalculatorEngine.Format(value, _forceScientific);
+
+    private void ToggleScientificFormat()
+    {
+        if (!TryReadDisplay(out var value)) return;
+        _forceScientific = !_forceScientific;
+        _display.Text = FormatValue(value);
+    }
+
+    private void StoreMemory()
+    {
+        if (!TryReadDisplay(out _memory)) return;
+        _hasMemory = true;
+    }
+
+    private void RecallMemory()
+    {
+        if (!_hasMemory) return;
+        _display.Text = FormatValue(_memory);
+        _expressionLabel.Text = "MR";
+        _startNewNumber = true;
+    }
+
+    private void ClearMemory()
+    {
+        _memory = 0;
+        _hasMemory = false;
+    }
+
+    private void ChangeMemory(int direction)
+    {
+        if (!TryReadDisplay(out var value)) return;
+        _memory = (_hasMemory ? _memory : 0) + direction * value;
+        _hasMemory = true;
+    }
+
+    private void OpenParenthesis()
+    {
+        _parentheses.Push((_engine.Result, _engine.PendingOperation));
+        _engine.Clear();
+        _display.Text = "0";
+        _expressionLabel.Text += " (";
+        _startNewNumber = true;
+    }
+
+    private void CloseParenthesis()
+    {
+        if (_parentheses.Count == 0) return;
+        if (!TryReadDisplay(out var value)) return;
+        try
+        {
+            var innerResult = _engine.Equals(value);
+            var outer = _parentheses.Pop();
+            _engine.Restore(outer.Accumulator, outer.Operation);
+            _display.Text = FormatValue(innerResult);
+            _expressionLabel.Text += ")";
+            _startNewNumber = true;
+        }
+        catch (Exception ex) when (ex is ArithmeticException or ArgumentException)
+        {
+            ShowCalculationError(ex.Message);
+        }
+    }
+
+    private void ApplyRoot()
+    {
+        if (_secondFunctions)
+            ApplyUnary(value => $"∛{FormatValue(value)}", Math.Cbrt);
+        else
+            ApplySquareRoot();
+    }
+
+    private void ApplyFactorial()
+    {
+        ApplyUnary(
+            value => $"{FormatValue(value)}!",
+            value =>
+            {
+                if (value < 0 || value != Math.Truncate(value) || value > 170)
+                    throw new ArgumentOutOfRangeException(nameof(value), "Факториал поддерживается для целых чисел от 0 до 170.");
+                var result = 1D;
+                for (var i = 2; i <= (int)value; i++) result *= i;
+                return result;
+            });
     }
 
     private void ToggleHistory()
@@ -328,7 +492,7 @@ public sealed class CalculatorForm : Form
         }
 
         _engine.Clear();
-        _display.Text = CalculatorEngine.Format(value);
+        _display.Text = FormatValue(value);
         _expressionLabel.Text = "Результат из истории";
         _startNewNumber = true;
 
@@ -477,7 +641,7 @@ public sealed class CalculatorForm : Form
             if (!double.IsFinite(result))
                 throw new OverflowException("Результат выходит за допустимый диапазон чисел.");
             var operationText = expression(value);
-            _display.Text = CalculatorEngine.Format(result);
+            _display.Text = FormatValue(result);
             _expressionLabel.Text = $"{operationText} =";
             AddHistoryEntry($"{operationText} = {_display.Text}");
             _startNewNumber = true;
@@ -497,9 +661,9 @@ public sealed class CalculatorForm : Form
             return;
         }
 
-        _display.Text = CalculatorEngine.Format(Math.Sqrt(value));
-        _expressionLabel.Text = $"√{CalculatorEngine.Format(value)} =";
-        AddHistoryEntry($"√{CalculatorEngine.Format(value)} = {_display.Text}");
+        _display.Text = FormatValue(Math.Sqrt(value));
+        _expressionLabel.Text = $"√{FormatValue(value)} =";
+        AddHistoryEntry($"√{FormatValue(value)} = {_display.Text}");
         _startNewNumber = true;
     }
 
@@ -521,7 +685,7 @@ public sealed class CalculatorForm : Form
     private void ToggleSign()
     {
         if (!TryReadDisplay(out var value)) return;
-        _display.Text = CalculatorEngine.Format(-value);
+        _display.Text = FormatValue(-value);
     }
 
     private void Backspace()
@@ -540,9 +704,9 @@ public sealed class CalculatorForm : Form
         var previousOperation = _engine.PendingOperation;
         try
         {
-            _display.Text = CalculatorEngine.Format(_engine.SelectOperation(value, operation));
+            _display.Text = FormatValue(_engine.SelectOperation(value, operation));
             if (previousValue is not null && previousOperation is not null)
-                AddHistoryEntry($"{CalculatorEngine.Format(previousValue.Value)} {previousOperation} {CalculatorEngine.Format(value)} = {_display.Text}");
+                AddHistoryEntry($"{FormatValue(previousValue.Value)} {previousOperation} {FormatValue(value)} = {_display.Text}");
             _expressionLabel.Text = $"{_display.Text} {operation}";
             _startNewNumber = true;
         }
@@ -560,11 +724,11 @@ public sealed class CalculatorForm : Form
         try
         {
             var result = _engine.Equals(value);
-            _display.Text = CalculatorEngine.Format(result);
+            _display.Text = FormatValue(result);
             if (left is not null && operation is not null)
             {
-                _expressionLabel.Text = $"{CalculatorEngine.Format(left.Value)} {operation} {CalculatorEngine.Format(value)} =";
-                AddHistoryEntry($"{CalculatorEngine.Format(left.Value)} {operation} {CalculatorEngine.Format(value)} = {_display.Text}");
+                _expressionLabel.Text = $"{FormatValue(left.Value)} {operation} {FormatValue(value)} =";
+                AddHistoryEntry($"{FormatValue(left.Value)} {operation} {FormatValue(value)} = {_display.Text}");
             }
             _startNewNumber = true;
         }
@@ -591,6 +755,7 @@ public sealed class CalculatorForm : Form
     private void ClearAll()
     {
         _engine.Clear();
+        _parentheses.Clear();
         _display.Text = "0";
         _expressionLabel.Text = string.Empty;
         _startNewNumber = true;
