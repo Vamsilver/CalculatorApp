@@ -8,6 +8,7 @@ public sealed class CalculatorForm : Form
     private readonly TextBox _display = new();
     private readonly Label _modeLabel = new();
     private readonly Label _expressionLabel = new();
+    private readonly Label _historyTitleLabel = new();
     private readonly ListBox _history = new();
     private readonly TableLayoutPanel _historyPanel = new();
     private readonly TableLayoutPanel _scientificTools = new();
@@ -187,13 +188,14 @@ public sealed class CalculatorForm : Form
         _historyPanel.Padding = new Padding(0, 8, 0, 0);
         _historyPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         _historyPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        _historyPanel.Controls.Add(new Label
-        {
-            Text = "История · двойной щелчок — использовать результат",
-            Dock = DockStyle.Fill,
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            AutoEllipsis = true
-        }, 0, 0);
+        _historyTitleLabel.Text = "История";
+        _historyTitleLabel.Dock = DockStyle.Fill;
+        _historyTitleLabel.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+        _historyTitleLabel.AutoEllipsis = false;
+        _historyTitleLabel.TextAlign = ContentAlignment.MiddleLeft;
+        _historyTitleLabel.SizeChanged += (_, _) => FitHistoryTitle();
+        _toolTip.SetToolTip(_historyTitleLabel, "Дважды щёлкните по строке, чтобы использовать результат");
+        _historyPanel.Controls.Add(_historyTitleLabel, 0, 0);
         _history.Dock = DockStyle.Fill;
         _history.IntegralHeight = false;
         _history.HorizontalScrollbar = true;
@@ -732,15 +734,74 @@ public sealed class CalculatorForm : Form
             Dock = DockStyle.Fill,
             Margin = new Padding(2),
             Font = new Font("Segoe UI Variable Text", fontSize),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Padding = new Padding(0, 0, 0, 2),
+            UseCompatibleTextRendering = false,
             FlatStyle = FlatStyle.Flat,
             Cursor = Cursors.Hand
         };
         button.FlatAppearance.BorderSize = 1;
-        button.Resize += (_, _) => RoundButton(button, 5);
+        button.Resize += (_, _) =>
+        {
+            RoundButton(button, 5);
+            FitKeypadButtonText(button);
+        };
         button.Click += handler;
         _keypad.Controls.Add(button, column, row);
         if (span > 1) _keypad.SetColumnSpan(button, span);
         return button;
+    }
+
+    private static void FitKeypadButtonText(Button button)
+    {
+        if (button.ClientSize.Width <= 0 || button.ClientSize.Height <= 0) return;
+        var maximumSize = button.Text.Length > 4 ? 9F : 12F;
+        var selectedSize = 8F;
+
+        for (var size = maximumSize; size >= 8F; size -= 0.5F)
+        {
+            using var candidate = new Font("Segoe UI", size);
+            var measured = TextRenderer.MeasureText(
+                button.Text,
+                candidate,
+                new Size(int.MaxValue, int.MaxValue),
+                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+            if (measured.Width <= button.ClientSize.Width - 10 && measured.Height <= button.ClientSize.Height - 12)
+            {
+                selectedSize = size;
+                break;
+            }
+        }
+
+        if (Math.Abs(button.Font.Size - selectedSize) <= 0.1F) return;
+        var previousFont = button.Font;
+        button.Font = new Font("Segoe UI", selectedSize);
+        previousFont.Dispose();
+    }
+
+    private void FitHistoryTitle()
+    {
+        if (_historyTitleLabel.ClientSize.Width <= 0) return;
+        string[] variants =
+        {
+            "История · двойной щелчок — использовать результат",
+            "История · двойной щелчок — выбрать",
+            "История вычислений",
+            "История"
+        };
+
+        _historyTitleLabel.Text = variants[^1];
+        foreach (var variant in variants)
+        {
+            var width = TextRenderer.MeasureText(
+                variant,
+                _historyTitleLabel.Font,
+                new Size(int.MaxValue, int.MaxValue),
+                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width;
+            if (width > _historyTitleLabel.ClientSize.Width - 4) continue;
+            _historyTitleLabel.Text = variant;
+            break;
+        }
     }
 
     private static void RoundButton(Control control, int radius)
