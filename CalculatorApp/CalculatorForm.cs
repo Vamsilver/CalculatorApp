@@ -58,22 +58,29 @@ public sealed class CalculatorForm : Form
         _sidePanel.FlowDirection = FlowDirection.TopDown;
         _sidePanel.WrapContents = false;
         _sidePanel.Margin = Padding.Empty;
-        _sidePanel.Padding = new Padding(6, 12, 6, 3);
+        _sidePanel.Padding = new Padding(8, 10, 8, 8);
         _sidePanel.BorderStyle = BorderStyle.FixedSingle;
-        var closeButton = IconButton("\uE700", (_, _) => ToggleSidebar());
+        var closeButton = SidebarButton("☰   Калькулятор", (_, _) => ToggleSidebar());
         _toolTip.SetToolTip(closeButton, "Закрыть боковую панель");
-        var saveButton = IconButton("\uE74E", SaveHistory);
-        var loadButton = IconButton("\uE896", LoadHistory);
+        var fileSection = SidebarSection("ФАЙЛ И ИСТОРИЯ");
+        var saveButton = SidebarButton("💾   Сохранить историю", SaveHistory);
+        var loadButton = SidebarButton("⇩   Загрузить историю", LoadHistory);
         _toolTip.SetToolTip(saveButton, "Сохранить историю");
         _toolTip.SetToolTip(loadButton, "Загрузить историю");
         _sidePanel.Controls.Add(closeButton);
+        _sidePanel.Controls.Add(fileSection);
         _sidePanel.Controls.Add(saveButton);
         _sidePanel.Controls.Add(loadButton);
-        _themeButton.Text = "\uE708";
-        _themeButton.Size = new Size(46, 46);
-        _themeButton.Font = new Font("Segoe Fluent Icons", 18F);
+        _sidePanel.Controls.Add(SidebarSection("ОФОРМЛЕНИЕ"));
+        _themeButton.Text = "☾   Тёмная тема";
+        _themeButton.Size = new Size(232, 46);
+        _themeButton.Font = new Font("Segoe UI", 11F);
+        _themeButton.TextAlign = ContentAlignment.MiddleLeft;
+        _themeButton.Padding = new Padding(10, 0, 0, 0);
         _themeButton.FlatStyle = FlatStyle.Flat;
-        _themeButton.Margin = new Padding(0, 4, 0, 4);
+        _themeButton.FlatAppearance.BorderSize = 0;
+        _themeButton.Margin = new Padding(0, 2, 0, 2);
+        _themeButton.Cursor = Cursors.Hand;
         _themeButton.Click += (_, _) => { _darkTheme = !_darkTheme; ApplyTheme(); };
         _toolTip.SetToolTip(_themeButton, "Включить тёмную тему");
         _sidePanel.Controls.Add(_themeButton);
@@ -289,8 +296,8 @@ public sealed class CalculatorForm : Form
 
     private void AnimateSidebar(object? sender, EventArgs e)
     {
-        const float expandedWidth = 62;
-        const float step = 6;
+        const float expandedWidth = 250;
+        const float step = 18;
         var target = _sidebarOpen ? expandedWidth : 0;
         var current = _sidePanel.Width;
 
@@ -307,16 +314,32 @@ public sealed class CalculatorForm : Form
         _sidePanel.BringToFront();
     }
 
-    private static Button IconButton(string icon, EventHandler handler)
+    private static Label SidebarSection(string text) => new()
+    {
+        Text = text,
+        Size = new Size(232, 32),
+        Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+        ForeColor = Color.DimGray,
+        TextAlign = ContentAlignment.BottomLeft,
+        Padding = new Padding(10, 0, 0, 4),
+        Margin = new Padding(0, 6, 0, 0)
+    };
+
+    private static Button SidebarButton(string text, EventHandler handler)
     {
         var button = new Button
         {
-            Text = icon,
-            Size = new Size(46, 46),
-            Font = new Font("Segoe Fluent Icons", 18F),
+            Text = text,
+            Size = new Size(232, 46),
+            Font = new Font("Segoe UI", 11F),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(10, 0, 0, 0),
             FlatStyle = FlatStyle.Flat,
-            Margin = new Padding(0, 4, 0, 4)
+            Margin = new Padding(0, 2, 0, 2),
+            Cursor = Cursors.Hand
         };
+        button.FlatAppearance.BorderSize = 0;
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(225, 225, 225);
         button.Click += handler;
         return button;
     }
@@ -493,11 +516,22 @@ public sealed class CalculatorForm : Form
         _display.ForeColor = foreground;
         _history.BackColor = _display.BackColor;
         _history.ForeColor = foreground;
+        foreach (var button in _sidePanel.Controls.OfType<Button>())
+        {
+            button.FlatAppearance.MouseOverBackColor = _darkTheme
+                ? Color.FromArgb(62, 67, 77)
+                : Color.FromArgb(225, 225, 225);
+        }
+        foreach (var section in _sidePanel.Controls.OfType<Label>())
+            section.ForeColor = _darkTheme ? Color.Silver : Color.DimGray;
         _equalsButton.BackColor = _darkTheme ? Color.FromArgb(0, 95, 184) : Color.FromArgb(0, 120, 215);
         _equalsButton.ForeColor = Color.White;
         _equalsButton.FlatStyle = FlatStyle.Flat;
         _equalsButton.FlatAppearance.BorderSize = 0;
-        _themeButton.Text = _darkTheme ? "\uE706" : "\uE708";
+        _themeButton.Text = _darkTheme ? "☀   Светлая тема" : "☾   Тёмная тема";
+        _themeButton.FlatAppearance.MouseOverBackColor = _darkTheme
+            ? Color.FromArgb(62, 67, 77)
+            : Color.FromArgb(225, 225, 225);
         _toolTip.SetToolTip(_themeButton, _darkTheme ? "Включить светлую тему" : "Включить тёмную тему");
     }
 
