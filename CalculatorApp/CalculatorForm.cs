@@ -314,7 +314,8 @@ public sealed class CalculatorForm : Form
             Margin = new Padding(2, 1, 2, 1),
             Padding = wide ? new Padding(6, 0, 6, 0) : Padding.Empty
         };
-        button.FlatAppearance.BorderSize = 1;
+        button.FlatAppearance.BorderSize = 0;
+        button.Paint += (_, e) => DrawButtonBorder(button, e.Graphics);
         button.Click += handler;
         return button;
     }
@@ -1025,6 +1026,29 @@ public sealed class CalculatorForm : Form
         var previousRegion = control.Region;
         control.Region = new Region(path);
         previousRegion?.Dispose();
+    }
+
+    private void DrawButtonBorder(Button button, Graphics graphics)
+    {
+        if (button.Tag as string == "equals" || button.Width < 3 || button.Height < 3) return;
+
+        var previousSmoothing = graphics.SmoothingMode;
+        graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        using var path = new System.Drawing.Drawing2D.GraphicsPath();
+        const float inset = 0.75F;
+        const float radius = 5F;
+        var bounds = new RectangleF(inset, inset, button.Width - inset * 2 - 1, button.Height - inset * 2 - 1);
+        var diameter = radius * 2;
+        path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+        path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+        path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+        path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+        path.CloseFigure();
+        using var pen = new Pen(
+            _darkTheme ? Color.FromArgb(82, 82, 82) : Color.FromArgb(198, 198, 198),
+            1.15F);
+        graphics.DrawPath(pen, path);
+        graphics.SmoothingMode = previousSmoothing;
     }
 
     private void ClearEntry()
