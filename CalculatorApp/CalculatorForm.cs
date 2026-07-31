@@ -6,7 +6,9 @@ public sealed class CalculatorForm : Form
 {
     private readonly CalculatorEngine _engine = new();
     private readonly TextBox _display = new();
+    private readonly Label _expressionLabel = new();
     private readonly ListBox _history = new();
+    private readonly TableLayoutPanel _historyPanel = new();
     private readonly TableLayoutPanel _keypad = new();
     private readonly Button _themeButton = new();
     private readonly ToolTip _toolTip = new();
@@ -14,8 +16,11 @@ public sealed class CalculatorForm : Form
     private readonly FlowLayoutPanel _sidePanel = new();
     private readonly Button _menuButton = new();
     private readonly System.Windows.Forms.Timer _sidebarTimer = new() { Interval = 15 };
+    private readonly System.Windows.Forms.Timer _historyTimer = new() { Interval = 15 };
     private ColumnStyle _sidebarColumn = null!;
+    private RowStyle _historyRow = null!;
     private bool _sidebarOpen;
+    private bool _historyOpen;
     private Button _equalsButton = null!;
     private bool _startNewNumber = true;
     private bool _darkTheme;
@@ -30,6 +35,7 @@ public sealed class CalculatorForm : Form
 
         BuildInterface();
         _sidebarTimer.Tick += AnimateSidebar;
+        _historyTimer.Tick += AnimateHistory;
         ApplyTheme();
     }
 
@@ -42,9 +48,10 @@ public sealed class CalculatorForm : Form
         _sidebarColumn = new ColumnStyle(SizeType.Absolute, 0);
         _root.ColumnStyles.Add(_sidebarColumn);
         _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 100));
-        _root.RowStyles.Add(new RowStyle(SizeType.Percent, 70));
-        _root.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 125));
+        _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _historyRow = new RowStyle(SizeType.Absolute, 0);
+        _root.RowStyles.Add(_historyRow);
         Controls.Add(_root);
 
         _sidePanel.Dock = DockStyle.Fill;
@@ -76,17 +83,48 @@ public sealed class CalculatorForm : Form
         _display.Dock = DockStyle.Fill;
         _display.BorderStyle = BorderStyle.None;
         _display.Margin = new Padding(4, 12, 4, 12);
-        var displayPanel = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
+        var displayPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            Margin = Padding.Empty,
+            ColumnCount = 3,
+            RowCount = 2
+        };
+        displayPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 46));
+        displayPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        displayPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 46));
+        displayPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+        displayPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _menuButton.Text = "\uE700";
         _menuButton.Font = new Font("Segoe Fluent Icons", 17F);
         _menuButton.FlatStyle = FlatStyle.Flat;
         _menuButton.FlatAppearance.BorderSize = 0;
-        _menuButton.Dock = DockStyle.Left;
-        _menuButton.Width = 46;
+        _menuButton.Dock = DockStyle.Fill;
         _menuButton.Click += (_, _) => ToggleSidebar();
         _toolTip.SetToolTip(_menuButton, "Открыть боковую панель");
-        displayPanel.Controls.Add(_display);
-        displayPanel.Controls.Add(_menuButton);
+        displayPanel.Controls.Add(_menuButton, 0, 0);
+
+        _expressionLabel.Text = string.Empty;
+        _expressionLabel.TextAlign = ContentAlignment.MiddleRight;
+        _expressionLabel.Dock = DockStyle.Fill;
+        _expressionLabel.Font = new Font("Segoe UI", 10F);
+        _expressionLabel.ForeColor = Color.DimGray;
+        displayPanel.Controls.Add(_expressionLabel, 1, 0);
+
+        var historyButton = new Button
+        {
+            Text = "\uE81C",
+            Font = new Font("Segoe Fluent Icons", 16F),
+            FlatStyle = FlatStyle.Flat,
+            Dock = DockStyle.Fill
+        };
+        historyButton.FlatAppearance.BorderSize = 0;
+        historyButton.Click += (_, _) => ToggleHistory();
+        _toolTip.SetToolTip(historyButton, "Показать историю");
+        displayPanel.Controls.Add(historyButton, 2, 0);
+
+        displayPanel.Controls.Add(_display, 0, 1);
+        displayPanel.SetColumnSpan(_display, 3);
         _root.Controls.Add(displayPanel, 1, 0);
 
         _keypad.Dock = DockStyle.Fill;
@@ -111,13 +149,42 @@ public sealed class CalculatorForm : Form
         AddButton("±", 0, 5, (_, _) => ToggleSign()); AddButton("0", 1, 5, DigitClick); AddButton(",", 2, 5, (_, _) => EnterDecimalSeparator());
         _equalsButton = AddButton("=", 3, 5, EqualsClick);
 
-        var historyPanel = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, Padding = new Padding(0, 8, 0, 0) };
-        historyPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
-        historyPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        historyPanel.Controls.Add(new Label { Text = "История", Dock = DockStyle.Fill, Font = new Font(Font, FontStyle.Bold) }, 0, 0);
+        _historyPanel.Dock = DockStyle.Fill;
+        _historyPanel.RowCount = 2;
+        _historyPanel.Padding = new Padding(0, 8, 0, 0);
+        _historyPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        _historyPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _historyPanel.Controls.Add(new Label { Text = "История вычислений", Dock = DockStyle.Fill, Font = new Font(Font, FontStyle.Bold) }, 0, 0);
         _history.Dock = DockStyle.Fill;
-        historyPanel.Controls.Add(_history, 0, 1);
-        _root.Controls.Add(historyPanel, 1, 2);
+        _history.IntegralHeight = false;
+        _historyPanel.Controls.Add(_history, 0, 1);
+        _root.Controls.Add(_historyPanel, 1, 2);
+    }
+
+    private void ToggleHistory()
+    {
+        _historyOpen = !_historyOpen;
+        _historyTimer.Start();
+    }
+
+    private void AnimateHistory(object? sender, EventArgs e)
+    {
+        const float expandedHeight = 175;
+        const float step = 14;
+        var target = _historyOpen ? expandedHeight : 0;
+        var current = _historyRow.Height;
+
+        if (Math.Abs(current - target) <= step)
+        {
+            _historyRow.Height = target;
+            _historyTimer.Stop();
+        }
+        else
+        {
+            _historyRow.Height = current + (_historyOpen ? step : -step);
+        }
+
+        _root.PerformLayout();
     }
 
     private void ToggleSidebar()
@@ -237,6 +304,7 @@ public sealed class CalculatorForm : Form
         try
         {
             _display.Text = CalculatorEngine.Format(_engine.SelectOperation(value, operation));
+            _expressionLabel.Text = $"{_display.Text} {operation}";
             _startNewNumber = true;
         }
         catch (Exception ex) when (ex is DivideByZeroException or OverflowException)
@@ -255,7 +323,11 @@ public sealed class CalculatorForm : Form
             var result = _engine.Equals(value);
             _display.Text = CalculatorEngine.Format(result);
             if (left is not null && operation is not null)
+            {
+                _expressionLabel.Text = $"{CalculatorEngine.Format(left.Value)} {operation} {CalculatorEngine.Format(value)} =";
                 _history.Items.Add($"{CalculatorEngine.Format(left.Value)} {operation} {CalculatorEngine.Format(value)} = {_display.Text}");
+                _history.TopIndex = _history.Items.Count - 1;
+            }
             _startNewNumber = true;
         }
         catch (Exception ex) when (ex is DivideByZeroException or OverflowException)
@@ -282,6 +354,7 @@ public sealed class CalculatorForm : Form
     {
         _engine.Clear();
         _display.Text = "0";
+        _expressionLabel.Text = string.Empty;
         _startNewNumber = true;
     }
 
