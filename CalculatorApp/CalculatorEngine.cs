@@ -77,9 +77,15 @@ public sealed class CalculatorEngine
         if (value == 0) return "0";
 
         var absolute = Math.Abs(value);
-        var format = forceScientific || absolute >= 1E15 || absolute < 1E-9
-            ? "0.##############E+0"
-            : "0.###############";
+        if (forceScientific || absolute >= 1E15 || absolute < 1E-9)
+            return value.ToString("0.##############E+0", CultureInfo.CurrentCulture);
+
+        const int significantDigits = 15;
+        var integerDigits = (int)Math.Floor(Math.Log10(absolute)) + 1;
+        var decimalPlaces = Math.Max(0, significantDigits - integerDigits);
+        var format = decimalPlaces == 0
+            ? "0"
+            : $"0.{new string('#', decimalPlaces)}";
         return value.ToString(format, CultureInfo.CurrentCulture);
     }
 
