@@ -9,14 +9,15 @@ public sealed class CalculatorForm : Form
     private readonly ListBox _history = new();
     private readonly TableLayoutPanel _keypad = new();
     private readonly Button _themeButton = new();
+    private Button _equalsButton = null!;
     private bool _startNewNumber = true;
     private bool _darkTheme;
 
     public CalculatorForm()
     {
         Text = "Калькулятор";
-        ClientSize = new Size(520, 570);
-        MinimumSize = new Size(500, 550);
+        ClientSize = new Size(390, 720);
+        MinimumSize = new Size(370, 680);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 11F);
 
@@ -29,59 +30,70 @@ public sealed class CalculatorForm : Form
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(12),
-            ColumnCount = 2,
-            RowCount = 3
+            Padding = new Padding(8),
+            ColumnCount = 1,
+            RowCount = 4
         };
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 70));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
         Controls.Add(root);
 
-        _display.Text = "0";
-        _display.ReadOnly = true;
-        _display.TextAlign = HorizontalAlignment.Right;
-        _display.Font = new Font("Segoe UI", 25F, FontStyle.Bold);
-        _display.Dock = DockStyle.Fill;
-        _display.Margin = new Padding(4, 4, 4, 10);
-        root.Controls.Add(_display, 0, 0);
-        root.SetColumnSpan(_display, 2);
-
-        _keypad.Dock = DockStyle.Fill;
-        _keypad.ColumnCount = 4;
-        _keypad.RowCount = 5;
-        for (var i = 0; i < 4; i++) _keypad.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-        for (var i = 0; i < 5; i++) _keypad.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
-        root.Controls.Add(_keypad, 0, 1);
-
-        AddButton("C", 0, 0, (_, _) => ClearAll());
-        AddButton("±", 1, 0, (_, _) => ToggleSign());
-        AddButton(",", 2, 0, (_, _) => EnterDecimalSeparator());
-        AddButton("÷", 3, 0, OperationClick);
-        AddButton("7", 0, 1, DigitClick); AddButton("8", 1, 1, DigitClick); AddButton("9", 2, 1, DigitClick); AddButton("×", 3, 1, OperationClick);
-        AddButton("4", 0, 2, DigitClick); AddButton("5", 1, 2, DigitClick); AddButton("6", 2, 2, DigitClick); AddButton("−", 3, 2, OperationClick);
-        AddButton("1", 0, 3, DigitClick); AddButton("2", 1, 3, DigitClick); AddButton("3", 2, 3, DigitClick); AddButton("+", 3, 3, OperationClick);
-        AddButton("0", 0, 4, DigitClick, 2); AddButton("⌫", 2, 4, (_, _) => Backspace()); AddButton("=", 3, 4, EqualsClick);
-
-        var historyPanel = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, Padding = new Padding(10, 0, 0, 0) };
-        historyPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
-        historyPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        historyPanel.Controls.Add(new Label { Text = "История", Dock = DockStyle.Fill, Font = new Font(Font, FontStyle.Bold) }, 0, 0);
-        _history.Dock = DockStyle.Fill;
-        historyPanel.Controls.Add(_history, 0, 1);
-        root.Controls.Add(historyPanel, 1, 1);
-
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight };
+        var actions = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Margin = Padding.Empty
+        };
         actions.Controls.Add(ActionButton("Сохранить", SaveHistory));
         actions.Controls.Add(ActionButton("Загрузить", LoadHistory));
         _themeButton.Text = "Тёмная тема";
         _themeButton.AutoSize = true;
         _themeButton.Click += (_, _) => { _darkTheme = !_darkTheme; ApplyTheme(); };
         actions.Controls.Add(_themeButton);
-        root.Controls.Add(actions, 0, 2);
-        root.SetColumnSpan(actions, 2);
+        root.Controls.Add(actions, 0, 0);
+
+        _display.Text = "0";
+        _display.ReadOnly = true;
+        _display.TextAlign = HorizontalAlignment.Right;
+        _display.Font = new Font("Segoe UI", 34F, FontStyle.Regular);
+        _display.Dock = DockStyle.Fill;
+        _display.BorderStyle = BorderStyle.None;
+        _display.Margin = new Padding(4, 12, 4, 12);
+        root.Controls.Add(_display, 0, 1);
+
+        _keypad.Dock = DockStyle.Fill;
+        _keypad.ColumnCount = 4;
+        _keypad.RowCount = 6;
+        for (var i = 0; i < 4; i++) _keypad.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        for (var i = 0; i < 6; i++) _keypad.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / 6));
+        _keypad.Margin = Padding.Empty;
+        root.Controls.Add(_keypad, 0, 2);
+
+        AddButton("%", 0, 0, (_, _) => ApplyUnary(value => value / 100));
+        AddButton("CE", 1, 0, (_, _) => ClearEntry());
+        AddButton("C", 2, 0, (_, _) => ClearAll());
+        AddButton("⌫", 3, 0, (_, _) => Backspace());
+        AddButton("1/x", 0, 1, (_, _) => ApplyUnary(value => value == 0 ? throw new DivideByZeroException("Деление на ноль невозможно.") : 1 / value));
+        AddButton("x²", 1, 1, (_, _) => ApplyUnary(value => value * value));
+        AddButton("²√x", 2, 1, (_, _) => ApplySquareRoot());
+        AddButton("÷", 3, 1, OperationClick);
+        AddButton("7", 0, 2, DigitClick); AddButton("8", 1, 2, DigitClick); AddButton("9", 2, 2, DigitClick); AddButton("×", 3, 2, OperationClick);
+        AddButton("4", 0, 3, DigitClick); AddButton("5", 1, 3, DigitClick); AddButton("6", 2, 3, DigitClick); AddButton("−", 3, 3, OperationClick);
+        AddButton("1", 0, 4, DigitClick); AddButton("2", 1, 4, DigitClick); AddButton("3", 2, 4, DigitClick); AddButton("+", 3, 4, OperationClick);
+        AddButton("±", 0, 5, (_, _) => ToggleSign()); AddButton("0", 1, 5, DigitClick); AddButton(",", 2, 5, (_, _) => EnterDecimalSeparator());
+        _equalsButton = AddButton("=", 3, 5, EqualsClick);
+
+        var historyPanel = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, Padding = new Padding(0, 8, 0, 0) };
+        historyPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        historyPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        historyPanel.Controls.Add(new Label { Text = "История", Dock = DockStyle.Fill, Font = new Font(Font, FontStyle.Bold) }, 0, 0);
+        _history.Dock = DockStyle.Fill;
+        historyPanel.Controls.Add(_history, 0, 1);
+        root.Controls.Add(historyPanel, 0, 3);
     }
 
     private Button ActionButton(string text, EventHandler handler)
@@ -91,12 +103,46 @@ public sealed class CalculatorForm : Form
         return button;
     }
 
-    private void AddButton(string text, int column, int row, EventHandler handler, int span = 1)
+    private Button AddButton(string text, int column, int row, EventHandler handler, int span = 1)
     {
         var button = new Button { Text = text, Dock = DockStyle.Fill, Margin = new Padding(4), Font = new Font("Segoe UI", 15F) };
         button.Click += handler;
         _keypad.Controls.Add(button, column, row);
         if (span > 1) _keypad.SetColumnSpan(button, span);
+        return button;
+    }
+
+    private void ClearEntry()
+    {
+        _display.Text = "0";
+        _startNewNumber = true;
+    }
+
+    private void ApplyUnary(Func<decimal, decimal> operation)
+    {
+        if (!TryReadDisplay(out var value)) return;
+        try
+        {
+            _display.Text = CalculatorEngine.Format(operation(value));
+            _startNewNumber = true;
+        }
+        catch (Exception ex) when (ex is DivideByZeroException or OverflowException)
+        {
+            ShowCalculationError(ex.Message);
+        }
+    }
+
+    private void ApplySquareRoot()
+    {
+        if (!TryReadDisplay(out var value)) return;
+        if (value < 0)
+        {
+            ShowCalculationError("Нельзя извлечь квадратный корень из отрицательного числа.");
+            return;
+        }
+
+        _display.Text = CalculatorEngine.Format((decimal)Math.Sqrt((double)value));
+        _startNewNumber = true;
     }
 
     private void DigitClick(object? sender, EventArgs e)
@@ -206,6 +252,10 @@ public sealed class CalculatorForm : Form
         _display.ForeColor = foreground;
         _history.BackColor = _display.BackColor;
         _history.ForeColor = foreground;
+        _equalsButton.BackColor = _darkTheme ? Color.FromArgb(0, 95, 184) : Color.FromArgb(0, 120, 215);
+        _equalsButton.ForeColor = Color.White;
+        _equalsButton.FlatStyle = FlatStyle.Flat;
+        _equalsButton.FlatAppearance.BorderSize = 0;
         _themeButton.Text = _darkTheme ? "Светлая тема" : "Тёмная тема";
     }
 
