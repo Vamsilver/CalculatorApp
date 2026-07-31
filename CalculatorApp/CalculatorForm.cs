@@ -20,9 +20,9 @@ public sealed class CalculatorForm : Form
     private readonly TableLayoutPanel _root = new();
     private readonly FlowLayoutPanel _sidePanel = new();
     private readonly Button _menuButton = new();
+    private readonly Button _historyButton = new();
     private readonly System.Windows.Forms.Timer _sidebarTimer = new() { Interval = 15 };
     private readonly System.Windows.Forms.Timer _historyTimer = new() { Interval = 15 };
-    private RowStyle _historyRow = null!;
     private RowStyle _scientificToolsRow = null!;
     private bool _sidebarOpen;
     private bool _historyOpen;
@@ -51,6 +51,7 @@ public sealed class CalculatorForm : Form
         BuildInterface();
         _sidebarTimer.Tick += AnimateSidebar;
         _historyTimer.Tick += AnimateHistory;
+        Resize += (_, _) => LayoutHistoryPanel();
         ApplyTheme();
     }
 
@@ -59,14 +60,12 @@ public sealed class CalculatorForm : Form
         _root.Dock = DockStyle.Fill;
         _root.Padding = new Padding(3);
         _root.ColumnCount = 1;
-        _root.RowCount = 4;
+        _root.RowCount = 3;
         _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 145));
         _scientificToolsRow = new RowStyle(SizeType.Absolute, 34);
         _root.RowStyles.Add(_scientificToolsRow);
         _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        _historyRow = new RowStyle(SizeType.Absolute, 0);
-        _root.RowStyles.Add(_historyRow);
         Controls.Add(_root);
 
         _sidePanel.Location = Point.Empty;
@@ -159,17 +158,17 @@ public sealed class CalculatorForm : Form
         displayPanel.Controls.Add(_expressionLabel, 1, 1);
         displayPanel.SetColumnSpan(_expressionLabel, 2);
 
-        var historyButton = new Button
-        {
-            Text = "\uE81C",
-            Font = new Font("Segoe Fluent Icons", 16F),
-            FlatStyle = FlatStyle.Flat,
-            Dock = DockStyle.Fill
-        };
-        historyButton.FlatAppearance.BorderSize = 0;
-        historyButton.Click += (_, _) => ToggleHistory();
-        _toolTip.SetToolTip(historyButton, "Показать историю");
-        displayPanel.Controls.Add(historyButton, 2, 0);
+        _historyButton.Text = string.Empty;
+        _historyButton.Image = CreateFluentIcon("\uE81C", SystemColors.ControlText);
+        _historyButton.ImageAlign = ContentAlignment.MiddleCenter;
+        _historyButton.FlatStyle = FlatStyle.Flat;
+        _historyButton.Dock = DockStyle.Fill;
+        _historyButton.Margin = Padding.Empty;
+        _historyButton.Padding = Padding.Empty;
+        _historyButton.FlatAppearance.BorderSize = 0;
+        _historyButton.Click += (_, _) => ToggleHistory();
+        _toolTip.SetToolTip(_historyButton, "Показать историю");
+        displayPanel.Controls.Add(_historyButton, 2, 0);
 
         displayPanel.Controls.Add(_display, 0, 2);
         displayPanel.SetColumnSpan(_display, 3);
@@ -183,7 +182,7 @@ public sealed class CalculatorForm : Form
         _root.Controls.Add(_keypad, 0, 2);
         BuildStandardKeypad();
 
-        _historyPanel.Dock = DockStyle.Fill;
+        _historyPanel.Dock = DockStyle.None;
         _historyPanel.RowCount = 2;
         _historyPanel.Padding = new Padding(0, 8, 0, 0);
         _historyPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
@@ -207,7 +206,9 @@ public sealed class CalculatorForm : Form
             e.SuppressKeyPress = true;
         };
         _historyPanel.Controls.Add(_history, 0, 1);
-        _root.Controls.Add(_historyPanel, 0, 3);
+        _historyPanel.Visible = false;
+        Controls.Add(_historyPanel);
+        LayoutHistoryPanel();
         _sidePanel.BringToFront();
     }
 
@@ -537,6 +538,11 @@ public sealed class CalculatorForm : Form
     private void ToggleHistory()
     {
         _historyOpen = !_historyOpen;
+        if (_historyOpen)
+        {
+            _historyPanel.Visible = true;
+            _historyPanel.BringToFront();
+        }
         _historyTimer.Start();
     }
 
@@ -545,19 +551,30 @@ public sealed class CalculatorForm : Form
         const float expandedHeight = 175;
         const float step = 14;
         var target = _historyOpen ? expandedHeight : 0;
-        var current = _historyRow.Height;
+        var current = _historyPanel.Height;
 
         if (Math.Abs(current - target) <= step)
         {
-            _historyRow.Height = target;
+            _historyPanel.Height = (int)target;
             _historyTimer.Stop();
+            if (!_historyOpen) _historyPanel.Visible = false;
         }
         else
         {
-            _historyRow.Height = current + (_historyOpen ? step : -step);
+            _historyPanel.Height = (int)(current + (_historyOpen ? step : -step));
         }
 
-        _root.PerformLayout();
+        LayoutHistoryPanel();
+    }
+
+    private void LayoutHistoryPanel()
+    {
+        const int margin = 3;
+        _historyPanel.SetBounds(
+            margin,
+            ClientSize.Height - _historyPanel.Height - margin,
+            Math.Max(1, ClientSize.Width - margin * 2),
+            _historyPanel.Height);
     }
 
     private void UseSelectedHistoryResult()
@@ -948,6 +965,9 @@ public sealed class CalculatorForm : Form
         _display.BackColor = background;
         _display.ForeColor = foreground;
         _expressionLabel.ForeColor = _darkTheme ? Color.FromArgb(190, 190, 190) : Color.FromArgb(90, 90, 90);
+        var previousHistoryIcon = _historyButton.Image;
+        _historyButton.Image = CreateFluentIcon("\uE81C", foreground);
+        previousHistoryIcon?.Dispose();
         _history.BackColor = _darkTheme ? Color.FromArgb(40, 40, 40) : Color.White;
         _history.ForeColor = foreground;
         foreach (var button in _keypad.Controls.OfType<Button>())
