@@ -63,7 +63,7 @@ public sealed class CalculatorForm : Form
         _root.ColumnCount = 1;
         _root.RowCount = 3;
         _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 145));
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 125));
         _scientificToolsRow = new RowStyle(SizeType.Absolute, 34);
         _root.RowStyles.Add(_scientificToolsRow);
         _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -587,6 +587,7 @@ public sealed class CalculatorForm : Form
         if (equalsIndex < 0) return;
 
         var resultText = entry[(equalsIndex + 1)..].Trim();
+        var expressionText = entry[..equalsIndex].Trim();
         var styles = NumberStyles.Float | NumberStyles.AllowThousands;
         var parsed = double.TryParse(resultText, styles, CultureInfo.CurrentCulture, out var value)
             || double.TryParse(resultText, styles, CultureInfo.InvariantCulture, out value);
@@ -599,7 +600,11 @@ public sealed class CalculatorForm : Form
 
         _engine.Clear();
         _display.Text = FormatValue(value);
-        _expressionLabel.Text = "Результат из истории";
+        _expressionLabel.Text = string.IsNullOrWhiteSpace(expressionText)
+            ? "Результат из истории"
+            : $"{expressionText} =";
+        _calculationExpression = string.Empty;
+        _expressionHasCurrentValue = true;
         _startNewNumber = true;
 
         if (_historyOpen)
