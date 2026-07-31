@@ -11,6 +11,9 @@ public sealed class CalculatorForm : Form
     private readonly ListBox _history = new();
     private readonly TableLayoutPanel _historyPanel = new();
     private readonly TableLayoutPanel _scientificTools = new();
+    private readonly FlowLayoutPanel _formatBar = new();
+    private readonly TableLayoutPanel _memoryBar = new();
+    private readonly FlowLayoutPanel _functionBar = new();
     private readonly TableLayoutPanel _keypad = new();
     private readonly Button _themeButton = new();
     private readonly ToolTip _toolTip = new();
@@ -40,10 +43,10 @@ public sealed class CalculatorForm : Form
     public CalculatorForm()
     {
         Text = "Калькулятор";
-        ClientSize = new Size(440, 720);
-        MinimumSize = new Size(420, 680);
+        ClientSize = new Size(320, 520);
+        MinimumSize = new Size(320, 520);
         StartPosition = FormStartPosition.CenterScreen;
-        Font = new Font("Segoe UI", 11F);
+        Font = new Font("Segoe UI Variable Text", 10F);
 
         BuildInterface();
         _sidebarTimer.Tick += AnimateSidebar;
@@ -54,12 +57,12 @@ public sealed class CalculatorForm : Form
     private void BuildInterface()
     {
         _root.Dock = DockStyle.Fill;
-        _root.Padding = new Padding(8);
+        _root.Padding = new Padding(3);
         _root.ColumnCount = 1;
         _root.RowCount = 4;
         _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 125));
-        _scientificToolsRow = new RowStyle(SizeType.Absolute, 0);
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 145));
+        _scientificToolsRow = new RowStyle(SizeType.Absolute, 34);
         _root.RowStyles.Add(_scientificToolsRow);
         _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _historyRow = new RowStyle(SizeType.Absolute, 0);
@@ -144,7 +147,7 @@ public sealed class CalculatorForm : Form
         _modeLabel.Text = "Обычный";
         _modeLabel.TextAlign = ContentAlignment.MiddleLeft;
         _modeLabel.Dock = DockStyle.Fill;
-        _modeLabel.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+        _modeLabel.Font = new Font("Segoe UI Variable Display", 14F, FontStyle.Bold);
         displayPanel.Controls.Add(_modeLabel, 1, 0);
 
         _expressionLabel.Text = string.Empty;
@@ -218,35 +221,56 @@ public sealed class CalculatorForm : Form
         _scientificTools.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
         _scientificTools.RowStyles.Add(new RowStyle(SizeType.Percent, 42));
 
-        var formatBar = new FlowLayoutPanel { Dock = DockStyle.Fill, Margin = Padding.Empty, WrapContents = false };
+        _formatBar.Dock = DockStyle.Fill;
+        _formatBar.Margin = Padding.Empty;
+        _formatBar.WrapContents = false;
         Button? angleButton = null;
         angleButton = ToolButton(_degreesMode ? "DEG" : "RAD", (_, _) =>
         {
             _degreesMode = !_degreesMode;
             angleButton!.Text = _degreesMode ? "DEG" : "RAD";
         });
-        formatBar.Controls.Add(angleButton);
-        formatBar.Controls.Add(ToolButton("F-E", (_, _) => ToggleScientificFormat()));
-        _scientificTools.Controls.Add(formatBar, 0, 0);
+        _formatBar.Controls.Add(angleButton);
+        _formatBar.Controls.Add(ToolButton("F-E", (_, _) => ToggleScientificFormat()));
+        _scientificTools.Controls.Add(_formatBar, 0, 0);
 
-        var memoryBar = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = Padding.Empty, ColumnCount = 6, RowCount = 1 };
-        for (var i = 0; i < 6; i++) memoryBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F / 6));
-        memoryBar.Controls.Add(ToolButton("MC", (_, _) => ClearMemory()), 0, 0);
-        memoryBar.Controls.Add(ToolButton("MR", (_, _) => RecallMemory()), 1, 0);
-        memoryBar.Controls.Add(ToolButton("M+", (_, _) => ChangeMemory(1)), 2, 0);
-        memoryBar.Controls.Add(ToolButton("M−", (_, _) => ChangeMemory(-1)), 3, 0);
-        memoryBar.Controls.Add(ToolButton("MS", (_, _) => StoreMemory()), 4, 0);
-        memoryBar.Controls.Add(ToolButton("M⌄", (_, _) => RecallMemory()), 5, 0);
-        _scientificTools.Controls.Add(memoryBar, 0, 1);
+        _memoryBar.Dock = DockStyle.Fill;
+        _memoryBar.Margin = Padding.Empty;
+        _memoryBar.ColumnCount = 6;
+        _memoryBar.RowCount = 1;
+        for (var i = 0; i < 6; i++) _memoryBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F / 6));
+        _memoryBar.Controls.Add(ToolButton("MC", (_, _) => ClearMemory()), 0, 0);
+        _memoryBar.Controls.Add(ToolButton("MR", (_, _) => RecallMemory()), 1, 0);
+        _memoryBar.Controls.Add(ToolButton("M+", (_, _) => ChangeMemory(1)), 2, 0);
+        _memoryBar.Controls.Add(ToolButton("M−", (_, _) => ChangeMemory(-1)), 3, 0);
+        _memoryBar.Controls.Add(ToolButton("MS", (_, _) => StoreMemory()), 4, 0);
+        _memoryBar.Controls.Add(ToolButton("M⌄", (_, _) => RecallMemory()), 5, 0);
+        _scientificTools.Controls.Add(_memoryBar, 0, 1);
 
-        var functionBar = new FlowLayoutPanel { Dock = DockStyle.Fill, Margin = Padding.Empty, WrapContents = false };
+        _functionBar.Dock = DockStyle.Fill;
+        _functionBar.Margin = Padding.Empty;
+        _functionBar.WrapContents = false;
         Button? trigButton = null;
         trigButton = ToolButton("△  Тригонометрия  ⌄", (_, _) => ShowTrigMenu(trigButton!), true);
         Button? functionsButton = null;
         functionsButton = ToolButton("ƒ  Функции  ⌄", (_, _) => ShowFunctionsMenu(functionsButton!), true);
-        functionBar.Controls.Add(trigButton);
-        functionBar.Controls.Add(functionsButton);
-        _scientificTools.Controls.Add(functionBar, 0, 2);
+        _functionBar.Controls.Add(trigButton);
+        _functionBar.Controls.Add(functionsButton);
+        _scientificTools.Controls.Add(_functionBar, 0, 2);
+        SetToolPanelMode(false);
+    }
+
+    private void SetToolPanelMode(bool scientific)
+    {
+        _scientificToolsRow.Height = scientific ? 108 : 34;
+        _formatBar.Visible = scientific;
+        _functionBar.Visible = scientific;
+        _scientificTools.RowStyles[0].SizeType = SizeType.Absolute;
+        _scientificTools.RowStyles[0].Height = scientific ? 30 : 0;
+        _scientificTools.RowStyles[1].SizeType = SizeType.Absolute;
+        _scientificTools.RowStyles[1].Height = 34;
+        _scientificTools.RowStyles[2].SizeType = SizeType.Percent;
+        _scientificTools.RowStyles[2].Height = scientific ? 100 : 0;
     }
 
     private static Button ToolButton(string text, EventHandler handler, bool wide = false)
@@ -276,8 +300,7 @@ public sealed class CalculatorForm : Form
         }
 
         _scientificMode = scientific;
-        _scientificToolsRow.Height = scientific ? 108 : 0;
-        _scientificTools.Visible = scientific;
+        SetToolPanelMode(scientific);
         _modeLabel.Text = scientific ? "Инженерный" : "Обычный";
         ClearAll();
         if (scientific) BuildScientificKeypad();
@@ -683,11 +706,40 @@ public sealed class CalculatorForm : Form
 
     private Button AddButton(string text, int column, int row, EventHandler handler, int span = 1)
     {
-        var button = new Button { Text = text, Dock = DockStyle.Fill, Margin = new Padding(4), Font = new Font("Segoe UI", 15F) };
+        var isNumberKey = text.All(char.IsDigit) || text is "," or "±";
+        var fontSize = _scientificMode ? (text.Length > 4 ? 9F : 11F) : 12F;
+        var button = new Button
+        {
+            Text = text,
+            Tag = text == "=" ? "equals" : isNumberKey ? "number" : "function",
+            Dock = DockStyle.Fill,
+            Margin = new Padding(2),
+            Font = new Font("Segoe UI Variable Text", fontSize),
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand
+        };
+        button.FlatAppearance.BorderSize = 1;
+        button.Resize += (_, _) => RoundButton(button, 5);
         button.Click += handler;
         _keypad.Controls.Add(button, column, row);
         if (span > 1) _keypad.SetColumnSpan(button, span);
         return button;
+    }
+
+    private static void RoundButton(Control control, int radius)
+    {
+        if (control.Width <= 0 || control.Height <= 0) return;
+        using var path = new System.Drawing.Drawing2D.GraphicsPath();
+        var diameter = radius * 2;
+        var bounds = new Rectangle(0, 0, control.Width, control.Height);
+        path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+        path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+        path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+        path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+        path.CloseFigure();
+        var previousRegion = control.Region;
+        control.Region = new Region(path);
+        previousRegion?.Dispose();
     }
 
     private void ClearEntry()
@@ -890,13 +942,40 @@ public sealed class CalculatorForm : Form
 
     private void ApplyTheme()
     {
-        var background = _darkTheme ? Color.FromArgb(35, 39, 47) : SystemColors.Control;
+        var background = _darkTheme ? Color.FromArgb(32, 32, 32) : Color.FromArgb(243, 243, 243);
         var foreground = _darkTheme ? Color.WhiteSmoke : SystemColors.ControlText;
         ApplyColors(this, background, foreground);
-        _display.BackColor = _darkTheme ? Color.FromArgb(22, 25, 30) : Color.White;
+        _display.BackColor = background;
         _display.ForeColor = foreground;
-        _history.BackColor = _display.BackColor;
+        _expressionLabel.ForeColor = _darkTheme ? Color.FromArgb(190, 190, 190) : Color.FromArgb(90, 90, 90);
+        _history.BackColor = _darkTheme ? Color.FromArgb(40, 40, 40) : Color.White;
         _history.ForeColor = foreground;
+        foreach (var button in _keypad.Controls.OfType<Button>())
+        {
+            var role = button.Tag as string;
+            var buttonBackground = role switch
+            {
+                "number" => _darkTheme ? Color.FromArgb(59, 59, 59) : Color.FromArgb(251, 251, 251),
+                "equals" => _darkTheme ? Color.FromArgb(0, 95, 184) : Color.FromArgb(0, 120, 215),
+                _ => _darkTheme ? Color.FromArgb(50, 50, 50) : Color.FromArgb(247, 247, 247)
+            };
+            button.BackColor = buttonBackground;
+            button.ForeColor = role == "equals" ? Color.White : foreground;
+            button.FlatAppearance.BorderColor = _darkTheme ? Color.FromArgb(68, 68, 68) : Color.FromArgb(220, 220, 220);
+            button.FlatAppearance.MouseOverBackColor = role == "equals"
+                ? (_darkTheme ? Color.FromArgb(20, 110, 200) : Color.FromArgb(20, 130, 225))
+                : (_darkTheme ? Color.FromArgb(72, 72, 72) : Color.FromArgb(232, 232, 232));
+            RoundButton(button, 5);
+        }
+        foreach (var button in DescendantButtons(_scientificTools))
+        {
+            button.BackColor = background;
+            button.ForeColor = foreground;
+            button.FlatAppearance.BorderSize = 0;
+            button.FlatAppearance.MouseOverBackColor = _darkTheme
+                ? Color.FromArgb(55, 55, 55)
+                : Color.FromArgb(229, 229, 229);
+        }
         _themeButton.Tag = _darkTheme ? "\uE706" : "\uE708";
         foreach (var button in _sidePanel.Controls.OfType<Button>())
         {
@@ -912,9 +991,6 @@ public sealed class CalculatorForm : Form
         }
         foreach (var section in _sidePanel.Controls.OfType<Label>())
             section.ForeColor = _darkTheme ? Color.Silver : Color.DimGray;
-        _equalsButton.BackColor = _darkTheme ? Color.FromArgb(0, 95, 184) : Color.FromArgb(0, 120, 215);
-        _equalsButton.ForeColor = Color.White;
-        _equalsButton.FlatStyle = FlatStyle.Flat;
         _equalsButton.FlatAppearance.BorderSize = 0;
         _themeButton.Text = _darkTheme ? "Светлая тема" : "Тёмная тема";
         _themeButton.FlatAppearance.MouseOverBackColor = _darkTheme
@@ -931,6 +1007,15 @@ public sealed class CalculatorForm : Form
         {
             if (child is Button) child.BackColor = background;
             ApplyColors(child, background, foreground);
+        }
+    }
+
+    private static IEnumerable<Button> DescendantButtons(Control parent)
+    {
+        foreach (Control child in parent.Controls)
+        {
+            if (child is Button button) yield return button;
+            foreach (var nested in DescendantButtons(child)) yield return nested;
         }
     }
 }
