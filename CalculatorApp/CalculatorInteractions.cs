@@ -130,7 +130,28 @@ public sealed partial class CalculatorForm
     {
         var overlayOpen = _sidebarOpen || _historyOpen;
         _targetDimAmount = overlayOpen ? 0.24 : 0;
+        if (overlayOpen) ClearButtonHighlights();
         _dimmingTimer.Start();
+    }
+
+    private void ClearButtonHighlights()
+    {
+        _buttonAnimations.Clear();
+        _interactionTimer.Stop();
+        ActiveControl = null;
+
+        foreach (var button in _keypad.Controls.OfType<Button>())
+        {
+            var baseColor = Blend(GetButtonBaseColor(button), Color.Black, _dimAmount);
+            button.BackColor = baseColor;
+            button.FlatAppearance.MouseOverBackColor = baseColor;
+            button.FlatAppearance.MouseDownBackColor = baseColor;
+        }
+        foreach (var button in DescendantButtons(_scientificTools))
+        {
+            button.FlatAppearance.MouseOverBackColor = button.BackColor;
+            button.FlatAppearance.MouseDownBackColor = button.BackColor;
+        }
     }
 
     private void AnimateDimming(object? sender, EventArgs e)
@@ -168,6 +189,9 @@ public sealed partial class CalculatorForm
             button.FlatAppearance.MouseOverBackColor = _dimAmount <= 0
                 ? GetButtonHoverColor(button)
                 : color;
+            button.FlatAppearance.MouseDownBackColor = _dimAmount <= 0
+                ? Blend(GetButtonBaseColor(button), _darkTheme ? Color.White : Color.Black, 0.14)
+                : color;
         }
         foreach (var button in DescendantButtons(_scientificTools))
         {
@@ -175,6 +199,7 @@ public sealed partial class CalculatorForm
             button.FlatAppearance.MouseOverBackColor = _dimAmount <= 0
                 ? (_darkTheme ? Color.FromArgb(55, 55, 55) : Color.FromArgb(229, 229, 229))
                 : dimmedBackground;
+            button.FlatAppearance.MouseDownBackColor = button.FlatAppearance.MouseOverBackColor;
         }
     }
 
