@@ -18,6 +18,7 @@ public sealed partial class CalculatorForm
             TextAlign = ContentAlignment.MiddleCenter,
             Padding = new Padding(0, 0, 0, 2),
             UseCompatibleTextRendering = false,
+            UseVisualStyleBackColor = false,
             FlatStyle = FlatStyle.Flat,
             TabStop = false,
             CausesValidation = false,
@@ -146,11 +147,13 @@ public sealed partial class CalculatorForm
             button.BackColor = baseColor;
             button.FlatAppearance.MouseOverBackColor = baseColor;
             button.FlatAppearance.MouseDownBackColor = baseColor;
+            button.Invalidate();
         }
         foreach (var button in DescendantButtons(_scientificTools))
         {
             button.FlatAppearance.MouseOverBackColor = button.BackColor;
             button.FlatAppearance.MouseDownBackColor = button.BackColor;
+            button.Invalidate();
         }
     }
 
@@ -192,6 +195,7 @@ public sealed partial class CalculatorForm
             button.FlatAppearance.MouseDownBackColor = _dimAmount <= 0
                 ? Blend(GetButtonBaseColor(button), _darkTheme ? Color.White : Color.Black, 0.14)
                 : color;
+            button.Invalidate();
         }
         foreach (var button in DescendantButtons(_scientificTools))
         {
@@ -200,6 +204,7 @@ public sealed partial class CalculatorForm
                 ? (_darkTheme ? Color.FromArgb(55, 55, 55) : Color.FromArgb(229, 229, 229))
                 : dimmedBackground;
             button.FlatAppearance.MouseDownBackColor = button.FlatAppearance.MouseOverBackColor;
+            button.Invalidate();
         }
     }
 
@@ -301,7 +306,24 @@ public sealed partial class CalculatorForm
 
     private void DrawButtonBorder(Button button, Graphics graphics)
     {
-        if (button.Tag as string == "equals" || button.Width < 3 || button.Height < 3) return;
+        if (button.Width < 3 || button.Height < 3) return;
+
+        if (_sidebarOpen || _historyOpen)
+        {
+            var background = Blend(GetButtonBaseColor(button), Color.Black, _dimAmount);
+            using var backgroundBrush = new SolidBrush(background);
+            graphics.FillRectangle(backgroundBrush, button.ClientRectangle);
+            var textColor = _darkTheme ? Color.FromArgb(220, 220, 220) : SystemColors.ControlText;
+            TextRenderer.DrawText(
+                graphics,
+                button.Text,
+                button.Font,
+                button.ClientRectangle,
+                textColor,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+        }
+
+        if (button.Tag as string == "equals") return;
 
         var previousSmoothing = graphics.SmoothingMode;
         graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
