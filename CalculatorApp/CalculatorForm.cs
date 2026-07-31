@@ -140,7 +140,7 @@ public sealed class CalculatorForm : Form
         _display.Font = new Font("Segoe UI", 34F, FontStyle.Regular);
         _display.Dock = DockStyle.Fill;
         _display.BorderStyle = BorderStyle.None;
-        _display.Margin = new Padding(4, 12, 4, 12);
+        _display.Margin = new Padding(4, 1, 4, 7);
         _display.TextChanged += (_, _) =>
         {
             FitDisplayText();
@@ -176,7 +176,7 @@ public sealed class CalculatorForm : Form
         displayPanel.Controls.Add(_modeLabel, 1, 0);
 
         _expressionLabel.Text = string.Empty;
-        _expressionLabel.TextAlign = ContentAlignment.MiddleRight;
+        _expressionLabel.TextAlign = ContentAlignment.BottomRight;
         _expressionLabel.Dock = DockStyle.Fill;
         _expressionLabel.Font = new Font("Segoe UI", 10F);
         _expressionLabel.ForeColor = Color.DimGray;
@@ -314,7 +314,7 @@ public sealed class CalculatorForm : Form
             Margin = new Padding(2, 1, 2, 1),
             Padding = wide ? new Padding(6, 0, 6, 0) : Padding.Empty
         };
-        button.FlatAppearance.BorderSize = 0;
+        button.FlatAppearance.BorderSize = 1;
         button.Click += handler;
         return button;
     }
@@ -1253,7 +1253,7 @@ public sealed class CalculatorForm : Form
             };
             button.BackColor = buttonBackground;
             button.ForeColor = role == "equals" ? Color.White : foreground;
-            button.FlatAppearance.BorderColor = _darkTheme ? Color.FromArgb(68, 68, 68) : Color.FromArgb(220, 220, 220);
+            button.FlatAppearance.BorderColor = _darkTheme ? Color.FromArgb(66, 66, 66) : Color.FromArgb(226, 226, 226);
             button.FlatAppearance.MouseOverBackColor = role == "equals"
                 ? (_darkTheme ? Color.FromArgb(20, 110, 200) : Color.FromArgb(20, 130, 225))
                 : (_darkTheme ? Color.FromArgb(72, 72, 72) : Color.FromArgb(232, 232, 232));
