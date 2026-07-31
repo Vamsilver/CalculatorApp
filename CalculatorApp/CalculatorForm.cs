@@ -24,6 +24,9 @@ public sealed class CalculatorForm : Form
     private readonly Button _historyButton = new();
     private readonly System.Windows.Forms.Timer _sidebarTimer = new() { Interval = 15 };
     private readonly System.Windows.Forms.Timer _historyTimer = new() { Interval = 15 };
+    private readonly System.Windows.Forms.Timer _interactionTimer = new() { Interval = 16 };
+    private readonly System.Windows.Forms.Timer _displayFadeTimer = new() { Interval = 16 };
+    private readonly Dictionary<Button, ButtonAnimation> _buttonAnimations = new();
     private RowStyle _scientificToolsRow = null!;
     private bool _sidebarOpen;
     private bool _historyOpen;
@@ -37,6 +40,16 @@ public sealed class CalculatorForm : Form
     private readonly Stack<(double? Accumulator, string? Operation)> _parentheses = new();
     private string _calculationExpression = string.Empty;
     private bool _expressionHasCurrentValue;
+    private int _displayFadeFrame;
+    private bool _applyingTheme;
+
+    private sealed class ButtonAnimation(Color start, Color end, int frame, int duration)
+    {
+        public Color Start { get; } = start;
+        public Color End { get; } = end;
+        public int Frame { get; set; } = frame;
+        public int Duration { get; } = duration;
+    }
     private Button _equalsButton = null!;
     private bool _startNewNumber = true;
     private bool _darkTheme;
@@ -52,8 +65,11 @@ public sealed class CalculatorForm : Form
         BuildInterface();
         _sidebarTimer.Tick += AnimateSidebar;
         _historyTimer.Tick += AnimateHistory;
+        _interactionTimer.Tick += AnimateInteractions;
+        _displayFadeTimer.Tick += AnimateDisplay;
         Resize += (_, _) => LayoutHistoryPanel();
         ApplyTheme();
+        AnimateKeypadEntrance();
     }
 
     private void BuildInterface()
@@ -120,7 +136,11 @@ public sealed class CalculatorForm : Form
         _display.Dock = DockStyle.Fill;
         _display.BorderStyle = BorderStyle.None;
         _display.Margin = new Padding(4, 12, 4, 12);
-        _display.TextChanged += (_, _) => FitDisplayText();
+        _display.TextChanged += (_, _) =>
+        {
+            FitDisplayText();
+            StartDisplayAnimation();
+        };
         _display.Resize += (_, _) => FitDisplayText();
         var displayPanel = new TableLayoutPanel
         {
@@ -309,6 +329,7 @@ public sealed class CalculatorForm : Form
         if (scientific) BuildScientificKeypad();
         else BuildStandardKeypad();
         ApplyTheme();
+        AnimateKeypadEntrance();
         if (_sidebarOpen) ToggleSidebar();
     }
 
@@ -344,7 +365,7 @@ public sealed class CalculatorForm : Form
     private void BuildScientificKeypad()
     {
         ConfigureKeypad(5, 7);
-        AddButton("2nd", 0, 0, (_, _) => { _secondFunctions = !_secondFunctions; BuildScientificKeypad(); ApplyTheme(); });
+        AddButton("2nd", 0, 0, (_, _) => { _secondFunctions = !_secondFunctions; BuildScientificKeypad(); ApplyTheme(); AnimateKeypadEntrance(); });
         AddButton("π", 1, 0, (_, _) => SetConstant(Math.PI, "π")); AddButton("e", 2, 0, (_, _) => SetConstant(Math.E, "e"));
         AddButton("C", 3, 0, (_, _) => ClearAll()); AddButton("⌫", 4, 0, (_, _) => Backspace());
         AddButton(_secondFunctions ? "x³" : "x²", 0, 1, (_, _) => ApplyUnary(value => $"{FormatValue(value)}{(_secondFunctions ? "³" : "²")}", value => Math.Pow(value, _secondFunctions ? 3 : 2)));
@@ -751,10 +772,109 @@ public sealed class CalculatorForm : Form
             RoundButton(button, 5);
             FitKeypadButtonText(button);
         };
+        button.MouseDown += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Left) return;
+            _buttonAnimations.Remove(button);
+            var pressed = Blend(GetButtonBaseColor(button), _darkTheme ? Color.White : Color.Black, 0.14);
+            button.BackColor = pressed;
+            button.FlatAppearance.MouseDownBackColor = pressed;
+            button.FlatAppearance.MouseOverBackColor = pressed;
+        };
+        button.MouseUp += (_, _) => StartButtonAnimation(button, GetButtonHoverColor(button));
+        button.MouseLeave += (_, _) => StartButtonAnimation(button, GetButtonBaseColor(button));
         button.Click += handler;
         _keypad.Controls.Add(button, column, row);
         if (span > 1) _keypad.SetColumnSpan(button, span);
         return button;
+    }
+
+    private void StartButtonAnimation(Button button, Color target, int delay = 0)
+    {
+        if (button.IsDisposed) return;
+        _buttonAnimations[button] = new ButtonAnimation(button.BackColor, target, -delay, 9);
+        _interactionTimer.Start();
+    }
+
+    private void AnimateInteractions(object? sender, EventArgs e)
+    {
+        foreach (var pair in _buttonAnimations.ToArray())
+        {
+            var button = pair.Key;
+            var animation = pair.Value;
+            if (button.IsDisposed)
+            {
+                _buttonAnimations.Remove(button);
+                continue;
+            }
+
+            animation.Frame++;
+            if (animation.Frame < 0) continue;
+            var progress = Math.Clamp(animation.Frame / (double)animation.Duration, 0, 1);
+            var eased = 1 - Math.Pow(1 - progress, 3);
+            var color = Blend(animation.Start, animation.End, eased);
+            button.BackColor = color;
+            button.FlatAppearance.MouseOverBackColor = color;
+
+            if (progress < 1) continue;
+            button.BackColor = animation.End;
+            button.FlatAppearance.MouseOverBackColor = GetButtonHoverColor(button);
+            _buttonAnimations.Remove(button);
+        }
+
+        if (_buttonAnimations.Count == 0) _interactionTimer.Stop();
+    }
+
+    private void AnimateKeypadEntrance()
+    {
+        var delay = 0;
+        foreach (var button in _keypad.Controls.OfType<Button>().OrderBy(control => _keypad.GetRow(control)).ThenBy(control => _keypad.GetColumn(control)))
+        {
+            var target = GetButtonBaseColor(button);
+            button.BackColor = Blend(target, BackColor, 0.55);
+            StartButtonAnimation(button, target, delay++);
+        }
+    }
+
+    private void StartDisplayAnimation()
+    {
+        if (_applyingTheme) return;
+        _displayFadeFrame = 0;
+        _displayFadeTimer.Start();
+    }
+
+    private void AnimateDisplay(object? sender, EventArgs e)
+    {
+        const int duration = 9;
+        _displayFadeFrame++;
+        var progress = Math.Clamp(_displayFadeFrame / (double)duration, 0, 1);
+        var eased = 1 - Math.Pow(1 - progress, 3);
+        var foreground = _darkTheme ? Color.WhiteSmoke : SystemColors.ControlText;
+        _display.ForeColor = Blend(_display.BackColor, foreground, 0.42 + eased * 0.58);
+        if (progress < 1) return;
+        _display.ForeColor = foreground;
+        _displayFadeTimer.Stop();
+    }
+
+    private Color GetButtonBaseColor(Button button) => (button.Tag as string) switch
+    {
+        "number" => _darkTheme ? Color.FromArgb(59, 59, 59) : Color.FromArgb(251, 251, 251),
+        "equals" => _darkTheme ? Color.FromArgb(0, 95, 184) : Color.FromArgb(0, 120, 215),
+        _ => _darkTheme ? Color.FromArgb(50, 50, 50) : Color.FromArgb(247, 247, 247)
+    };
+
+    private Color GetButtonHoverColor(Button button) => button.Tag as string == "equals"
+        ? (_darkTheme ? Color.FromArgb(20, 110, 200) : Color.FromArgb(20, 130, 225))
+        : (_darkTheme ? Color.FromArgb(72, 72, 72) : Color.FromArgb(232, 232, 232));
+
+    private static Color Blend(Color from, Color to, double amount)
+    {
+        amount = Math.Clamp(amount, 0, 1);
+        return Color.FromArgb(
+            (int)Math.Round(from.A + (to.A - from.A) * amount),
+            (int)Math.Round(from.R + (to.R - from.R) * amount),
+            (int)Math.Round(from.G + (to.G - from.G) * amount),
+            (int)Math.Round(from.B + (to.B - from.B) * amount));
     }
 
     private static void FitKeypadButtonText(Button button)
@@ -1025,6 +1145,10 @@ public sealed class CalculatorForm : Form
 
     private void ApplyTheme()
     {
+        _applyingTheme = true;
+        _buttonAnimations.Clear();
+        _interactionTimer.Stop();
+        _displayFadeTimer.Stop();
         var background = _darkTheme ? Color.FromArgb(32, 32, 32) : Color.FromArgb(243, 243, 243);
         var foreground = _darkTheme ? Color.WhiteSmoke : SystemColors.ControlText;
         ApplyColors(this, background, foreground);
@@ -1083,6 +1207,7 @@ public sealed class CalculatorForm : Form
             ? Color.FromArgb(62, 67, 77)
             : Color.FromArgb(225, 225, 225);
         _toolTip.SetToolTip(_themeButton, _darkTheme ? "Включить светлую тему" : "Включить тёмную тему");
+        _applyingTheme = false;
     }
 
     private static void ApplyColors(Control parent, Color background, Color foreground)
