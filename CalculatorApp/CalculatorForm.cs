@@ -21,6 +21,7 @@ public sealed class CalculatorForm : Form
     private RowStyle _historyRow = null!;
     private bool _sidebarOpen;
     private bool _historyOpen;
+    private bool _fittingDisplay;
     private Button _equalsButton = null!;
     private bool _startNewNumber = true;
     private bool _darkTheme;
@@ -83,6 +84,8 @@ public sealed class CalculatorForm : Form
         _display.Dock = DockStyle.Fill;
         _display.BorderStyle = BorderStyle.None;
         _display.Margin = new Padding(4, 12, 4, 12);
+        _display.TextChanged += (_, _) => FitDisplayText();
+        _display.Resize += (_, _) => FitDisplayText();
         var displayPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -109,6 +112,7 @@ public sealed class CalculatorForm : Form
         _expressionLabel.Dock = DockStyle.Fill;
         _expressionLabel.Font = new Font("Segoe UI", 10F);
         _expressionLabel.ForeColor = Color.DimGray;
+        _expressionLabel.AutoEllipsis = true;
         displayPanel.Controls.Add(_expressionLabel, 1, 0);
 
         var historyButton = new Button
@@ -157,6 +161,7 @@ public sealed class CalculatorForm : Form
         _historyPanel.Controls.Add(new Label { Text = "История вычислений", Dock = DockStyle.Fill, Font = new Font(Font, FontStyle.Bold) }, 0, 0);
         _history.Dock = DockStyle.Fill;
         _history.IntegralHeight = false;
+        _history.HorizontalScrollbar = true;
         _historyPanel.Controls.Add(_history, 0, 1);
         _root.Controls.Add(_historyPanel, 1, 2);
     }
@@ -185,6 +190,47 @@ public sealed class CalculatorForm : Form
         }
 
         _root.PerformLayout();
+    }
+
+    private void FitDisplayText()
+    {
+        if (_fittingDisplay || _display.ClientSize.Width <= 0) return;
+
+        _fittingDisplay = true;
+        try
+        {
+            const float maximumSize = 34F;
+            const float minimumSize = 16F;
+            var availableWidth = Math.Max(1, _display.ClientSize.Width - 12);
+            var selectedSize = minimumSize;
+
+            for (var size = maximumSize; size >= minimumSize; size -= 1F)
+            {
+                using var candidateFont = new Font("Segoe UI", size, FontStyle.Regular);
+                var measuredWidth = TextRenderer.MeasureText(
+                    _display.Text,
+                    candidateFont,
+                    new Size(int.MaxValue, int.MaxValue),
+                    TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width;
+
+                if (measuredWidth <= availableWidth)
+                {
+                    selectedSize = size;
+                    break;
+                }
+            }
+
+            if (Math.Abs(_display.Font.Size - selectedSize) > 0.1F)
+            {
+                var previousFont = _display.Font;
+                _display.Font = new Font("Segoe UI", selectedSize, FontStyle.Regular);
+                previousFont.Dispose();
+            }
+        }
+        finally
+        {
+            _fittingDisplay = false;
+        }
     }
 
     private void ToggleSidebar()
