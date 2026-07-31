@@ -165,7 +165,11 @@ public sealed class CalculatorForm : Form
         _menuButton.FlatStyle = FlatStyle.Flat;
         _menuButton.FlatAppearance.BorderSize = 0;
         _menuButton.Dock = DockStyle.Fill;
-        _menuButton.Click += (_, _) => ToggleSidebar();
+        _menuButton.Click += (_, _) =>
+        {
+            if (_historyOpen) DismissOpenPanels();
+            else ToggleSidebar();
+        };
         _toolTip.SetToolTip(_menuButton, "Открыть боковую панель");
         displayPanel.Controls.Add(_menuButton, 0, 0);
 
@@ -192,12 +196,19 @@ public sealed class CalculatorForm : Form
         _historyButton.Margin = Padding.Empty;
         _historyButton.Padding = Padding.Empty;
         _historyButton.FlatAppearance.BorderSize = 0;
-        _historyButton.Click += (_, _) => ToggleHistory();
+        _historyButton.Click += (_, _) =>
+        {
+            if (_sidebarOpen) DismissOpenPanels();
+            else ToggleHistory();
+        };
         _toolTip.SetToolTip(_historyButton, "Показать историю");
         displayPanel.Controls.Add(_historyButton, 2, 0);
 
         displayPanel.Controls.Add(_display, 0, 2);
         displayPanel.SetColumnSpan(_display, 3);
+        _display.MouseDown += (_, _) => DismissOpenPanels();
+        _expressionLabel.MouseDown += (_, _) => DismissOpenPanels();
+        _modeLabel.MouseDown += (_, _) => DismissOpenPanels();
         _root.Controls.Add(displayPanel, 0, 0);
 
         BuildScientificTools();
@@ -236,6 +247,9 @@ public sealed class CalculatorForm : Form
         _historyPanel.Visible = false;
         Controls.Add(_historyPanel);
         LayoutHistoryPanel();
+        _root.MouseDown += (_, _) => DismissOpenPanels();
+        _keypad.MouseDown += (_, _) => DismissOpenPanels();
+        _scientificTools.MouseDown += (_, _) => DismissOpenPanels();
         _sidePanel.BringToFront();
     }
 
@@ -273,6 +287,7 @@ public sealed class CalculatorForm : Form
         _memoryBar.Controls.Add(ToolButton("M−", (_, _) => ChangeMemory(-1)), 3, 0);
         _memoryBar.Controls.Add(ToolButton("MS", (_, _) => StoreMemory()), 4, 0);
         _memoryBar.Controls.Add(ToolButton("M⌄", (_, _) => RecallMemory()), 5, 0);
+        foreach (var button in _memoryBar.Controls.OfType<Button>()) button.Dock = DockStyle.Fill;
         _scientificTools.Controls.Add(_memoryBar, 0, 0);
 
         _functionBar.Dock = DockStyle.Fill;
@@ -306,8 +321,9 @@ public sealed class CalculatorForm : Form
         var button = new Button
         {
             Text = text,
-            Dock = wide ? DockStyle.None : DockStyle.Fill,
+            Dock = DockStyle.None,
             AutoSize = wide,
+            Width = wide ? 75 : 52,
             Height = wide ? 30 : 22,
             FlatStyle = FlatStyle.Flat,
             Font = new Font("Segoe UI", 9F),
@@ -317,7 +333,11 @@ public sealed class CalculatorForm : Form
         button.FlatAppearance.BorderSize = 0;
         button.Click += (sender, args) =>
         {
-            if (_sidebarOpen || _historyOpen) return;
+            if (_sidebarOpen || _historyOpen)
+            {
+                DismissOpenPanels();
+                return;
+            }
             handler(sender, args);
         };
         return button;
@@ -332,6 +352,7 @@ public sealed class CalculatorForm : Form
         }
 
         _scientificMode = scientific;
+        _root.RowStyles[0].Height = scientific ? 110 : 125;
         SetToolPanelMode(scientific);
         _modeLabel.Text = scientific ? "Инженерный" : "Обычный";
         ClearAll();
@@ -702,6 +723,25 @@ public sealed class CalculatorForm : Form
         _toolTip.SetToolTip(_menuButton, _sidebarOpen ? "Закрыть боковую панель" : "Открыть боковую панель");
     }
 
+    private void DismissOpenPanels()
+    {
+        var changed = false;
+        if (_sidebarOpen)
+        {
+            _sidebarOpen = false;
+            _sidebarTimer.Start();
+            _toolTip.SetToolTip(_menuButton, "Открыть боковую панель");
+            changed = true;
+        }
+        if (_historyOpen)
+        {
+            _historyOpen = false;
+            _historyTimer.Start();
+            changed = true;
+        }
+        if (changed) UpdateDimmingTarget();
+    }
+
     private void AnimateSidebar(object? sender, EventArgs e)
     {
         const float expandedWidth = 250;
@@ -811,7 +851,11 @@ public sealed class CalculatorForm : Form
         button.MouseLeave += (_, _) => StartButtonAnimation(button, GetButtonBaseColor(button));
         button.Click += (sender, args) =>
         {
-            if (_sidebarOpen || _historyOpen) return;
+            if (_sidebarOpen || _historyOpen)
+            {
+                DismissOpenPanels();
+                return;
+            }
             handler(sender, args);
         };
         _keypad.Controls.Add(button, column, row);
