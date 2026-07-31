@@ -315,7 +315,6 @@ public sealed class CalculatorForm : Form
             Padding = wide ? new Padding(6, 0, 6, 0) : Padding.Empty
         };
         button.FlatAppearance.BorderSize = 0;
-        button.Paint += (_, e) => DrawButtonBorder(button, e.Graphics);
         button.Click += handler;
         return button;
     }
@@ -785,6 +784,7 @@ public sealed class CalculatorForm : Form
             Cursor = Cursors.Hand
         };
         button.FlatAppearance.BorderSize = 0;
+        button.Paint += (_, e) => DrawButtonBorder(button, e.Graphics);
         button.Resize += (_, _) =>
         {
             RoundButton(button, 5);
