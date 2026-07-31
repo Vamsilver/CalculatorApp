@@ -60,11 +60,11 @@ public sealed class CalculatorForm : Form
         _sidePanel.Margin = Padding.Empty;
         _sidePanel.Padding = new Padding(8, 10, 8, 8);
         _sidePanel.BorderStyle = BorderStyle.FixedSingle;
-        var closeButton = SidebarButton("☰   Калькулятор", (_, _) => ToggleSidebar());
+        var closeButton = SidebarButton("\uE700", "Калькулятор", (_, _) => ToggleSidebar());
         _toolTip.SetToolTip(closeButton, "Закрыть боковую панель");
         var fileSection = SidebarSection("ФАЙЛ И ИСТОРИЯ");
-        var saveButton = SidebarButton("💾   Сохранить историю", SaveHistory);
-        var loadButton = SidebarButton("⇩   Загрузить историю", LoadHistory);
+        var saveButton = SidebarButton("\uE74E", "Сохранить историю", SaveHistory);
+        var loadButton = SidebarButton("\uE896", "Загрузить историю", LoadHistory);
         _toolTip.SetToolTip(saveButton, "Сохранить историю");
         _toolTip.SetToolTip(loadButton, "Загрузить историю");
         _sidePanel.Controls.Add(closeButton);
@@ -72,11 +72,15 @@ public sealed class CalculatorForm : Form
         _sidePanel.Controls.Add(saveButton);
         _sidePanel.Controls.Add(loadButton);
         _sidePanel.Controls.Add(SidebarSection("ОФОРМЛЕНИЕ"));
-        _themeButton.Text = "☾   Тёмная тема";
+        _themeButton.Text = "Тёмная тема";
+        _themeButton.Tag = "\uE708";
+        _themeButton.Image = CreateFluentIcon("\uE708", SystemColors.ControlText);
+        _themeButton.ImageAlign = ContentAlignment.MiddleLeft;
+        _themeButton.TextImageRelation = TextImageRelation.ImageBeforeText;
         _themeButton.Size = new Size(232, 46);
         _themeButton.Font = new Font("Segoe UI", 11F);
         _themeButton.TextAlign = ContentAlignment.MiddleLeft;
-        _themeButton.Padding = new Padding(10, 0, 0, 0);
+        _themeButton.Padding = new Padding(8, 0, 0, 0);
         _themeButton.FlatStyle = FlatStyle.Flat;
         _themeButton.FlatAppearance.BorderSize = 0;
         _themeButton.Margin = new Padding(0, 2, 0, 2);
@@ -325,15 +329,19 @@ public sealed class CalculatorForm : Form
         Margin = new Padding(0, 6, 0, 0)
     };
 
-    private static Button SidebarButton(string text, EventHandler handler)
+    private static Button SidebarButton(string glyph, string text, EventHandler handler)
     {
         var button = new Button
         {
             Text = text,
+            Tag = glyph,
+            Image = CreateFluentIcon(glyph, SystemColors.ControlText),
+            ImageAlign = ContentAlignment.MiddleLeft,
+            TextImageRelation = TextImageRelation.ImageBeforeText,
             Size = new Size(232, 46),
             Font = new Font("Segoe UI", 11F),
             TextAlign = ContentAlignment.MiddleLeft,
-            Padding = new Padding(10, 0, 0, 0),
+            Padding = new Padding(8, 0, 0, 0),
             FlatStyle = FlatStyle.Flat,
             Margin = new Padding(0, 2, 0, 2),
             Cursor = Cursors.Hand
@@ -342,6 +350,18 @@ public sealed class CalculatorForm : Form
         button.FlatAppearance.MouseOverBackColor = Color.FromArgb(225, 225, 225);
         button.Click += handler;
         return button;
+    }
+
+    private static Bitmap CreateFluentIcon(string glyph, Color color)
+    {
+        var bitmap = new Bitmap(28, 28);
+        using var graphics = Graphics.FromImage(bitmap);
+        using var font = new Font("Segoe Fluent Icons", 15F);
+        using var brush = new SolidBrush(color);
+        graphics.Clear(Color.Transparent);
+        graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        graphics.DrawString(glyph, font, brush, new PointF(2, 2));
+        return bitmap;
     }
 
     private Button AddButton(string text, int column, int row, EventHandler handler, int span = 1)
@@ -516,11 +536,18 @@ public sealed class CalculatorForm : Form
         _display.ForeColor = foreground;
         _history.BackColor = _display.BackColor;
         _history.ForeColor = foreground;
+        _themeButton.Tag = _darkTheme ? "\uE706" : "\uE708";
         foreach (var button in _sidePanel.Controls.OfType<Button>())
         {
             button.FlatAppearance.MouseOverBackColor = _darkTheme
                 ? Color.FromArgb(62, 67, 77)
                 : Color.FromArgb(225, 225, 225);
+            if (button.Tag is string glyph)
+            {
+                var previousImage = button.Image;
+                button.Image = CreateFluentIcon(glyph, foreground);
+                previousImage?.Dispose();
+            }
         }
         foreach (var section in _sidePanel.Controls.OfType<Label>())
             section.ForeColor = _darkTheme ? Color.Silver : Color.DimGray;
@@ -528,7 +555,7 @@ public sealed class CalculatorForm : Form
         _equalsButton.ForeColor = Color.White;
         _equalsButton.FlatStyle = FlatStyle.Flat;
         _equalsButton.FlatAppearance.BorderSize = 0;
-        _themeButton.Text = _darkTheme ? "☀   Светлая тема" : "☾   Тёмная тема";
+        _themeButton.Text = _darkTheme ? "Светлая тема" : "Тёмная тема";
         _themeButton.FlatAppearance.MouseOverBackColor = _darkTheme
             ? Color.FromArgb(62, 67, 77)
             : Color.FromArgb(225, 225, 225);
