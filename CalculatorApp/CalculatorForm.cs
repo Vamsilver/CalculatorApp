@@ -9,6 +9,7 @@ public sealed class CalculatorForm : Form
     private readonly ListBox _history = new();
     private readonly TableLayoutPanel _keypad = new();
     private readonly Button _themeButton = new();
+    private readonly ToolTip _toolTip = new();
     private Button _equalsButton = null!;
     private bool _startNewNumber = true;
     private bool _darkTheme;
@@ -16,8 +17,8 @@ public sealed class CalculatorForm : Form
     public CalculatorForm()
     {
         Text = "Калькулятор";
-        ClientSize = new Size(390, 720);
-        MinimumSize = new Size(370, 680);
+        ClientSize = new Size(440, 720);
+        MinimumSize = new Size(420, 680);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 11F);
 
@@ -31,30 +32,40 @@ public sealed class CalculatorForm : Form
         {
             Dock = DockStyle.Fill,
             Padding = new Padding(8),
-            ColumnCount = 1,
-            RowCount = 4
+            ColumnCount = 2,
+            RowCount = 3
         };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 70));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
         Controls.Add(root);
 
-        var actions = new FlowLayoutPanel
+        var sidePanel = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.LeftToRight,
+            FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
-            Margin = Padding.Empty
+            Margin = new Padding(6, 0, 0, 0),
+            Padding = new Padding(3, 8, 3, 3)
         };
-        actions.Controls.Add(ActionButton("Сохранить", SaveHistory));
-        actions.Controls.Add(ActionButton("Загрузить", LoadHistory));
-        _themeButton.Text = "Тёмная тема";
-        _themeButton.AutoSize = true;
+        var saveButton = IconButton("\uE74E", SaveHistory);
+        var loadButton = IconButton("\uE896", LoadHistory);
+        _toolTip.SetToolTip(saveButton, "Сохранить историю");
+        _toolTip.SetToolTip(loadButton, "Загрузить историю");
+        sidePanel.Controls.Add(saveButton);
+        sidePanel.Controls.Add(loadButton);
+        _themeButton.Text = "\uE708";
+        _themeButton.Size = new Size(46, 46);
+        _themeButton.Font = new Font("Segoe Fluent Icons", 18F);
+        _themeButton.FlatStyle = FlatStyle.Flat;
+        _themeButton.Margin = new Padding(0, 4, 0, 4);
         _themeButton.Click += (_, _) => { _darkTheme = !_darkTheme; ApplyTheme(); };
-        actions.Controls.Add(_themeButton);
-        root.Controls.Add(actions, 0, 0);
+        _toolTip.SetToolTip(_themeButton, "Включить тёмную тему");
+        sidePanel.Controls.Add(_themeButton);
+        root.Controls.Add(sidePanel, 1, 0);
+        root.SetRowSpan(sidePanel, 3);
 
         _display.Text = "0";
         _display.ReadOnly = true;
@@ -63,7 +74,7 @@ public sealed class CalculatorForm : Form
         _display.Dock = DockStyle.Fill;
         _display.BorderStyle = BorderStyle.None;
         _display.Margin = new Padding(4, 12, 4, 12);
-        root.Controls.Add(_display, 0, 1);
+        root.Controls.Add(_display, 0, 0);
 
         _keypad.Dock = DockStyle.Fill;
         _keypad.ColumnCount = 4;
@@ -71,7 +82,7 @@ public sealed class CalculatorForm : Form
         for (var i = 0; i < 4; i++) _keypad.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
         for (var i = 0; i < 6; i++) _keypad.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / 6));
         _keypad.Margin = Padding.Empty;
-        root.Controls.Add(_keypad, 0, 2);
+        root.Controls.Add(_keypad, 0, 1);
 
         AddButton("%", 0, 0, (_, _) => ApplyUnary(value => value / 100));
         AddButton("CE", 1, 0, (_, _) => ClearEntry());
@@ -93,12 +104,19 @@ public sealed class CalculatorForm : Form
         historyPanel.Controls.Add(new Label { Text = "История", Dock = DockStyle.Fill, Font = new Font(Font, FontStyle.Bold) }, 0, 0);
         _history.Dock = DockStyle.Fill;
         historyPanel.Controls.Add(_history, 0, 1);
-        root.Controls.Add(historyPanel, 0, 3);
+        root.Controls.Add(historyPanel, 0, 2);
     }
 
-    private Button ActionButton(string text, EventHandler handler)
+    private static Button IconButton(string icon, EventHandler handler)
     {
-        var button = new Button { Text = text, AutoSize = true };
+        var button = new Button
+        {
+            Text = icon,
+            Size = new Size(46, 46),
+            Font = new Font("Segoe Fluent Icons", 18F),
+            FlatStyle = FlatStyle.Flat,
+            Margin = new Padding(0, 4, 0, 4)
+        };
         button.Click += handler;
         return button;
     }
@@ -256,7 +274,8 @@ public sealed class CalculatorForm : Form
         _equalsButton.ForeColor = Color.White;
         _equalsButton.FlatStyle = FlatStyle.Flat;
         _equalsButton.FlatAppearance.BorderSize = 0;
-        _themeButton.Text = _darkTheme ? "Светлая тема" : "Тёмная тема";
+        _themeButton.Text = _darkTheme ? "\uE706" : "\uE708";
+        _toolTip.SetToolTip(_themeButton, _darkTheme ? "Включить светлую тему" : "Включить тёмную тему");
     }
 
     private static void ApplyColors(Control parent, Color background, Color foreground)
