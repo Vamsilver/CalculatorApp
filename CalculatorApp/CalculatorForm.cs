@@ -31,6 +31,8 @@ public sealed class CalculatorForm : Form
     private double _memory;
     private bool _hasMemory;
     private readonly Stack<(double? Accumulator, string? Operation)> _parentheses = new();
+    private string _calculationExpression = string.Empty;
+    private bool _expressionHasCurrentValue;
     private Button _equalsButton = null!;
     private bool _startNewNumber = true;
     private bool _darkTheme;
@@ -453,10 +455,14 @@ public sealed class CalculatorForm : Form
 
     private void OpenParenthesis()
     {
+        if ((!_startNewNumber || _expressionHasCurrentValue) && _engine.PendingOperation is null)
+            ExecuteOperation("×");
         _parentheses.Push((_engine.Result, _engine.PendingOperation));
         _engine.Clear();
         _display.Text = "0";
-        _expressionLabel.Text += " (";
+        _calculationExpression += "(";
+        _expressionLabel.Text = _calculationExpression;
+        _expressionHasCurrentValue = false;
         _startNewNumber = true;
     }
 
@@ -466,11 +472,15 @@ public sealed class CalculatorForm : Form
         if (!TryReadDisplay(out var value)) return;
         try
         {
+            if (!_expressionHasCurrentValue)
+                _calculationExpression += FormatValue(value);
             var innerResult = _engine.Equals(value);
             var outer = _parentheses.Pop();
             _engine.Restore(outer.Accumulator, outer.Operation);
             _display.Text = FormatValue(innerResult);
-            _expressionLabel.Text += ")";
+            _calculationExpression += ")";
+            _expressionLabel.Text = _calculationExpression;
+            _expressionHasCurrentValue = true;
             _startNewNumber = true;
         }
         catch (Exception ex) when (ex is ArithmeticException or ArgumentException)
@@ -696,8 +706,17 @@ public sealed class CalculatorForm : Form
                 throw new OverflowException("Результат выходит за допустимый диапазон чисел.");
             var operationText = expression(value);
             _display.Text = FormatValue(result);
-            _expressionLabel.Text = $"{operationText} =";
+            if (_calculationExpression.Length > 0)
+            {
+                _calculationExpression += operationText;
+                _expressionLabel.Text = _calculationExpression;
+            }
+            else
+            {
+                _expressionLabel.Text = $"{operationText} =";
+            }
             AddHistoryEntry($"{operationText} = {_display.Text}");
+            _expressionHasCurrentValue = true;
             _startNewNumber = true;
         }
         catch (Exception ex) when (ex is DivideByZeroException or OverflowException or ArgumentOutOfRangeException)
@@ -716,8 +735,18 @@ public sealed class CalculatorForm : Form
         }
 
         _display.Text = FormatValue(Math.Sqrt(value));
-        _expressionLabel.Text = $"√{FormatValue(value)} =";
+        var rootExpression = $"√{FormatValue(value)}";
+        if (_calculationExpression.Length > 0)
+        {
+            _calculationExpression += rootExpression;
+            _expressionLabel.Text = _calculationExpression;
+        }
+        else
+        {
+            _expressionLabel.Text = $"{rootExpression} =";
+        }
         AddHistoryEntry($"√{FormatValue(value)} = {_display.Text}");
+        _expressionHasCurrentValue = true;
         _startNewNumber = true;
     }
 
@@ -727,6 +756,7 @@ public sealed class CalculatorForm : Form
         if (_startNewNumber || _display.Text == "0") _display.Text = digit;
         else if (_display.Text.Length < 28) _display.Text += digit;
         _startNewNumber = false;
+        _expressionHasCurrentValue = false;
     }
 
     private void EnterDecimalSeparator()
@@ -734,6 +764,7 @@ public sealed class CalculatorForm : Form
         var separator = CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
         if (_startNewNumber) { _display.Text = "0" + separator; _startNewNumber = false; }
         else if (!_display.Text.Contains(separator)) _display.Text += separator;
+        _expressionHasCurrentValue = false;
     }
 
     private void ToggleSign()
@@ -746,6 +777,7 @@ public sealed class CalculatorForm : Form
     {
         if (_startNewNumber) return;
         _display.Text = _display.Text.Length > 1 ? _display.Text[..^1] : "0";
+        _expressionHasCurrentValue = false;
     }
 
     private void OperationClick(object? sender, EventArgs e)
@@ -761,7 +793,13 @@ public sealed class CalculatorForm : Form
             _display.Text = FormatValue(_engine.SelectOperation(value, operation));
             if (previousValue is not null && previousOperation is not null)
                 AddHistoryEntry($"{FormatValue(previousValue.Value)} {previousOperation} {FormatValue(value)} = {_display.Text}");
-            _expressionLabel.Text = $"{_display.Text} {operation}";
+            var displayedOperation = operation == "^" ? "^" : operation;
+            if (_expressionHasCurrentValue && _calculationExpression.Length > 0)
+                _calculationExpression += $" {displayedOperation} ";
+            else
+                _calculationExpression += $"{FormatValue(value)} {displayedOperation} ";
+            _expressionLabel.Text = _calculationExpression;
+            _expressionHasCurrentValue = false;
             _startNewNumber = true;
         }
         catch (Exception ex) when (ex is DivideByZeroException or OverflowException)
@@ -773,6 +811,13 @@ public sealed class CalculatorForm : Form
     private void EqualsClick(object? sender, EventArgs e)
     {
         if (!TryReadDisplay(out var value)) return;
+        while (_parentheses.Count > 0)
+        {
+            var depth = _parentheses.Count;
+            CloseParenthesis();
+            if (_parentheses.Count == depth) return;
+            if (!TryReadDisplay(out value)) return;
+        }
         var left = _engine.Result;
         var operation = _engine.PendingOperation;
         try
@@ -781,9 +826,13 @@ public sealed class CalculatorForm : Form
             _display.Text = FormatValue(result);
             if (left is not null && operation is not null)
             {
-                _expressionLabel.Text = $"{FormatValue(left.Value)} {operation} {FormatValue(value)} =";
-                AddHistoryEntry($"{FormatValue(left.Value)} {operation} {FormatValue(value)} = {_display.Text}");
+                if (!_expressionHasCurrentValue)
+                    _calculationExpression += FormatValue(value);
+                _expressionLabel.Text = $"{_calculationExpression} =";
+                AddHistoryEntry($"{_calculationExpression} = {_display.Text}");
             }
+            _calculationExpression = string.Empty;
+            _expressionHasCurrentValue = true;
             _startNewNumber = true;
         }
         catch (Exception ex) when (ex is DivideByZeroException or OverflowException)
@@ -810,6 +859,8 @@ public sealed class CalculatorForm : Form
     {
         _engine.Clear();
         _parentheses.Clear();
+        _calculationExpression = string.Empty;
+        _expressionHasCurrentValue = false;
         _display.Text = "0";
         _expressionLabel.Text = string.Empty;
         _startNewNumber = true;
